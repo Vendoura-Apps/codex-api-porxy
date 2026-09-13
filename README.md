@@ -68,11 +68,35 @@ six hours and reset when the server restarts.
 | `CODEX_BIN` | `codex` | Codex executable path |
 | `CODEX_WORKING_DIR` | server working directory | Repository Codex operates in |
 | `CODEX_SANDBOX` | `read-only` | `read-only`, `workspace-write`, or `danger-full-access` |
+| `CODEX_API_KEY` | unset | Require this value as a Bearer token on all `/v1` routes |
 | `DEBUG` | unset | Log HTTP request metadata |
 | `DEBUG_SUBPROCESS` | unset | Log Codex stderr |
 
-The server binds to loopback by default. It has no API-key authentication, so
-do not expose it to an untrusted network.
+The server binds to loopback by default. API-key authentication is disabled
+until `CODEX_API_KEY` is configured, so do not expose the default setup to an
+untrusted network.
+
+When `CODEX_API_KEY` is set, requests to `/v1/*` must include
+`Authorization: Bearer <key>`. The `/health` endpoint remains unauthenticated.
+
+## Private access with Tailscale
+
+Keep the proxy bound to `127.0.0.1` and publish it privately with Tailscale
+Serve:
+
+```bash
+tailscale serve --bg --https=8443 http://127.0.0.1:3456
+```
+
+Other devices in the same tailnet can then use:
+
+```text
+https://<device-name>.<tailnet-name>.ts.net:8443/v1/chat/completions
+```
+
+Configure the client API key with the same value as `CODEX_API_KEY`. Use
+`tailscale serve status` to inspect the mapping and
+`tailscale serve --https=8443 off` to disable it.
 
 ## Tests
 

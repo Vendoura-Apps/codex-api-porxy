@@ -6,6 +6,7 @@
 
 import express, { Express, Request, Response, NextFunction } from "express";
 import { createServer, Server } from "http";
+import { timingSafeEqual } from "crypto";
 import { handleChatCompletions, handleModels, handleHealth } from "./routes.js";
 
 export interface ServerConfig {
@@ -18,7 +19,14 @@ let serverInstance: Server | null = null;
 /**
  * Create and configure the Express app
  */
-function createApp(): Express {
+export function isValidBearerToken(authorization: string | undefined, expected: string): boolean {
+  if (!authorization?.startsWith("Bearer ")) return false;
+  const supplied = Buffer.from(authorization.slice("Bearer ".length));
+  const configured = Buffer.from(expected);
+  return supplied.length === configured.length && timingSafeEqual(supplied, configured);
+}
+
+export function createApp(): Express {
   const app = express();
 
   // Middleware: use raw body parser + manual JSON parse for better error diagnostics
@@ -68,6 +76,22 @@ function createApp(): Express {
   // Handle OPTIONS preflight
   app.options("*", (_req: Request, res: Response) => {
     res.sendStatus(200);
+  });
+
+  // Require a bearer token for API routes when CODEX_API_KEY is configured.
+  app.use("/v1", (req: Request, res: Response, next: NextFunction) => {
+    const apiKey = process.env.CODEX_API_KEY;
+    if (!apiKey || isValidBearerToken(req.get("authorization"), apiKey)) {
+      next();
+      return;
+    }
+    res.status(401).json({
+      error: {
+        message: "Invalid or missing API key",
+        type: "authentication_error",
+        code: "invalid_api_key",
+      },
+    });
   });
 
   // Routes
