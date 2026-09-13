@@ -78,9 +78,9 @@ export function createApp(): Express {
     res.sendStatus(200);
   });
 
-  // Require a bearer token for API routes when CODEX_API_KEY is configured.
+  // Require a bearer token for API routes when CODEX_PROXY_API_KEY is configured.
   app.use("/v1", (req: Request, res: Response, next: NextFunction) => {
-    const apiKey = process.env.CODEX_API_KEY;
+    const apiKey = process.env.CODEX_PROXY_API_KEY;
     if (!apiKey || isValidBearerToken(req.get("authorization"), apiKey)) {
       next();
       return;
