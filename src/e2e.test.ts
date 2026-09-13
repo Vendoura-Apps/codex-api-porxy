@@ -1,11 +1,11 @@
 /**
- * End-to-end test for the Claude Max API proxy.
+ * End-to-end test for the Codex CLI API proxy.
  *
  * Starts the real server, sends HTTP requests, and verifies responses
- * against the OpenAI API format. Requires Claude CLI to be installed
- * and authenticated — uses haiku for speed and cost.
+ * against the OpenAI API format. Live completion tests require an installed
+ * and authenticated Codex CLI and RUN_CODEX_E2E=1.
  *
- * Run: npm test
+ * Run: npm run test:e2e
  */
 
 import { describe, it, before, after } from "node:test";
@@ -14,15 +14,12 @@ import { startServer, stopServer } from "./server/index.js";
 import type { Server } from "http";
 import type { AddressInfo } from "net";
 
-console.warn("\n" + "=".repeat(70));
-console.warn("  WARNING: THIS TEST USES A REAL CLAUDE CODE CLI INSTANCE");
-console.warn("  IT WILL BURN TOKENS ON YOUR CLAUDE MAX SUBSCRIPTION");
-console.warn("=".repeat(70) + "\n");
+const RUN_LIVE = process.env.RUN_CODEX_E2E === "1";
 
 let baseUrl: string;
 let server: Server;
 
-// Longer timeout — Claude CLI can take a while
+// Longer timeout — Codex CLI can take a while
 const TEST_TIMEOUT = 120_000;
 
 before(async () => {
@@ -43,7 +40,7 @@ describe("health and models", () => {
     assert.equal(res.status, 200);
     const body = await res.json() as any;
     assert.equal(body.status, "ok");
-    assert.equal(body.provider, "claude-code-cli");
+    assert.equal(body.provider, "codex-cli");
     assert.ok(body.timestamp);
   });
 
@@ -55,21 +52,13 @@ describe("health and models", () => {
     assert.ok(Array.isArray(body.data));
 
     const ids = body.data.map((m: any) => m.id);
-    for (const expected of [
-      "claude-opus-4",
-      "claude-opus-4-6",
-      "claude-sonnet-4",
-      "claude-sonnet-4-5",
-      "claude-sonnet-4-6",
-      "claude-haiku-4",
-      "claude-haiku-4-5",
-    ]) {
+    for (const expected of ["codex"]) {
       assert.ok(ids.includes(expected), `missing model ${expected}`);
     }
 
     for (const model of body.data) {
       assert.equal(model.object, "model");
-      assert.equal(model.owned_by, "anthropic");
+      assert.equal(model.owned_by, "openai");
       assert.ok(typeof model.created === "number");
     }
   });
@@ -83,7 +72,7 @@ describe("health and models", () => {
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "haiku", messages: [] }),
+      body: JSON.stringify({ model: "codex", messages: [] }),
     });
     assert.equal(res.status, 400);
     const body = await res.json() as any;
@@ -94,13 +83,13 @@ describe("health and models", () => {
 
 // ─── Non-streaming completion ───────────────────────────────────────
 
-describe("non-streaming completion", { timeout: TEST_TIMEOUT }, () => {
+describe("non-streaming completion", { timeout: TEST_TIMEOUT, skip: !RUN_LIVE }, () => {
   it("returns a valid OpenAI response for a simple prompt", async () => {
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4",
+        model: "codex",
         stream: false,
         messages: [
           {
@@ -144,7 +133,7 @@ describe("non-streaming completion", { timeout: TEST_TIMEOUT }, () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "haiku",
+        model: "codex",
         stream: false,
         messages: [
           {
@@ -159,17 +148,49 @@ describe("non-streaming completion", { timeout: TEST_TIMEOUT }, () => {
     const body = await res.json() as any;
     assert.ok(body.choices[0].message.content.length > 0);
   });
+
+  it("resumes a Codex thread when request.user is stable", async () => {
+    const user = `e2e-${Date.now()}`;
+    const first = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "codex",
+        user,
+        messages: [{ role: "user", content: "Remember the codeword LANTERN. Reply ACK." }],
+      }),
+    });
+    assert.equal(first.status, 200);
+    const firstBody = await first.json() as any;
+
+    const second = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "codex",
+        user,
+        messages: [
+          { role: "user", content: "Remember the codeword LANTERN. Reply ACK." },
+          { role: "assistant", content: firstBody.choices[0].message.content },
+          { role: "user", content: "What codeword did I ask you to remember? Reply with only it." },
+        ],
+      }),
+    });
+    assert.equal(second.status, 200);
+    const secondBody = await second.json() as any;
+    assert.match(secondBody.choices[0].message.content, /LANTERN/i);
+  });
 });
 
 // ─── Streaming completion ───────────────────────────────────────────
 
-describe("streaming completion", { timeout: TEST_TIMEOUT }, () => {
+describe("streaming completion", { timeout: TEST_TIMEOUT, skip: !RUN_LIVE }, () => {
   it("returns valid SSE chunks with usage in final chunk", async () => {
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4",
+        model: "codex",
         stream: true,
         messages: [
           {

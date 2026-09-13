@@ -1,7 +1,7 @@
 /**
  * Express HTTP Server
  *
- * Provides OpenAI-compatible API endpoints that wrap Claude Code CLI
+ * Provides OpenAI-compatible API endpoints backed by Codex CLI
  */
 
 import express, { Express, Request, Response, NextFunction } from "express";
@@ -118,6 +118,7 @@ export async function startServer(config: ServerConfig): Promise<Server> {
     serverInstance = createServer(app);
 
     serverInstance.on("error", (err: NodeJS.ErrnoException) => {
+      serverInstance = null;
       if (err.code === "EADDRINUSE") {
         reject(new Error(`Port ${port} is already in use`));
       } else {
@@ -126,8 +127,10 @@ export async function startServer(config: ServerConfig): Promise<Server> {
     });
 
     serverInstance.listen(port, host, () => {
-      console.log(`[Server] Claude Code CLI provider running at http://${host}:${port}`);
-      console.log(`[Server] OpenAI-compatible endpoint: http://${host}:${port}/v1/chat/completions`);
+      const address = serverInstance!.address();
+      const actualPort = typeof address === "object" && address ? address.port : port;
+      console.log(`[Server] Codex CLI provider running at http://${host}:${actualPort}`);
+      console.log(`[Server] OpenAI-compatible endpoint: http://${host}:${actualPort}/v1/chat/completions`);
       resolve(serverInstance!);
     });
   });

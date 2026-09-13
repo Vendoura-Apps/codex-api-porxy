@@ -1,12 +1,12 @@
 /**
- * In-memory mapping from OpenAI request.user (Hermes conversation key) to a
- * persisted Claude CLI session. Lets the proxy --resume an existing CLI
+ * In-memory mapping from OpenAI request.user to a
+ * persisted Codex thread. Lets the proxy resume an existing CLI
  * session instead of cold-starting a fresh one and replaying the entire
  * message history on every request.
  */
 
 interface SessionEntry {
-  claudeSessionId: string;
+  threadId: string;
   messageCount: number;
   lastUsed: number;
 }
@@ -43,10 +43,10 @@ export function getSession(key: string): SessionEntry | undefined {
 
 export function setSession(
   key: string,
-  claudeSessionId: string,
+  threadId: string,
   messageCount: number
 ): void {
-  sessions.set(key, { claudeSessionId, messageCount, lastUsed: Date.now() });
+  sessions.set(key, { threadId, messageCount, lastUsed: Date.now() });
 }
 
 export function clearSession(key: string): void {
