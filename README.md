@@ -94,6 +94,9 @@ Other devices in the same tailnet can then use:
 https://<device-name>.<tailnet-name>.ts.net:8443/v1/chat/completions
 ```
 
+For the team endpoint, client setup, model choices, VS Code configuration, and
+troubleshooting, see [Panduan Endpoint Codex melalui Tailscale](docs/panduan-endpoint-codex-tailscale.md).
+
 Configure the client API key with the same value as `CODEX_PROXY_API_KEY`. Use
 `tailscale serve status` to inspect the mapping and
 `tailscale serve --https=8443 off` to disable it.
