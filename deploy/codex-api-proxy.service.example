@@ -1,0 +1,16 @@
+[Unit]
+Description=Codex CLI OpenAI-compatible API proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=REPLACE_WITH_PROJECT_DIRECTORY
+Environment=HOME=REPLACE_WITH_HOME_DIRECTORY
+Environment=PATH=REPLACE_WITH_NODE_BIN_DIRECTORY:REPLACE_WITH_HOME_DIRECTORY/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=REPLACE_WITH_NODE_EXECUTABLE REPLACE_WITH_PROJECT_DIRECTORY/dist/server/standalone.js 3456
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
