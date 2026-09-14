@@ -6,6 +6,9 @@ Chat Completions dan agent bridge berbasis function calling. Codex berjalan
 pada server, sedangkan tool untuk membaca repository, mengubah file, dan
 menjalankan terminal tetap berjalan pada perangkat klien.
 
+Untuk petunjuk langkah demi langkah yang dapat langsung diberikan kepada rekan,
+baca [Panduan Client Codex Agent](panduan-client-agent.md).
+
 Terakhir diperbarui: 14 September 2026.
 
 ## Ringkasan koneksi
