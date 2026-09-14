@@ -2,6 +2,7 @@
 
 import { startServer, stopServer } from "./index.js";
 import { verifyAuth, verifyCodex } from "../subprocess/manager.js";
+import { shutdownAgentBridges } from "../subprocess/agent-bridge.js";
 
 const DEFAULT_PORT = 3456;
 
@@ -28,6 +29,7 @@ async function main(): Promise<void> {
   console.log(`Try POST http://127.0.0.1:${port}/v1/chat/completions with model "codex".`);
 
   const shutdown = async () => {
+    shutdownAgentBridges();
     await stopServer();
     process.exit(0);
   };

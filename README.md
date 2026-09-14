@@ -1,9 +1,10 @@
 # Codex CLI API Proxy
 
 Expose an authenticated local Codex CLI through an OpenAI-compatible HTTP API.
-The proxy accepts Chat Completions requests, runs `codex exec --json`,
-translates Codex JSONL events into OpenAI responses, and can resume Codex
-threads.
+Plain chat requests run through `codex exec`. Requests containing OpenAI
+function tools use Codex App Server as an agent bridge, so a compatible client
+can execute file and terminal tools on its own device and return the results to
+Codex.
 
 ## Requirements
 
@@ -74,6 +75,8 @@ six hours and reset when the server restarts.
 | `CODEX_BIN` | `codex` | Codex executable path |
 | `CODEX_WORKING_DIR` | server working directory | Repository Codex operates in |
 | `CODEX_SANDBOX` | `read-only` | `read-only`, `workspace-write`, or `danger-full-access` |
+| `CODEX_AGENT_BRIDGE_CWD` | isolated directory under the OS temp folder | Safe server-side directory used by agent bridge sessions |
+| `CODEX_AGENT_BRIDGE_MAX_ACTIVE` | `16` | Maximum number of agent turns waiting for client tool results |
 | `CODEX_PROXY_API_KEY` | unset | Require this value as a Bearer token on all `/v1` routes |
 | `DEBUG` | unset | Log HTTP request metadata |
 | `DEBUG_SUBPROCESS` | unset | Log Codex stderr |
@@ -125,7 +128,12 @@ npm run test:e2e
 - Text messages and text content blocks are supported.
 - SSE text is delivered when a Codex agent-message item completes, rather than
   token by token.
-- Codex handles its tools internally. Tool calls are not forwarded to clients.
+- OpenAI function `tools`, assistant `tool_calls`, and `tool` result messages are
+  supported through the agent bridge. Tool execution and user approval belong
+  to the client device.
+- The agent bridge keeps pending calls in memory for up to 15 minutes. A proxy
+  restart invalidates pending `tool_call_id` values.
+- Codex App Server dynamic tools are currently an experimental Codex API.
 - Sampling fields such as `temperature` and `top_p` are not forwarded.
 - `reasoning_effort` is forwarded to Codex CLI as `model_reasoning_effort`.
 

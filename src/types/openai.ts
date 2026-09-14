@@ -9,8 +9,20 @@ export interface OpenAIContentBlock {
 }
 
 export interface OpenAIChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string | OpenAIContentBlock[];
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | OpenAIContentBlock[] | null;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: OpenAIToolCall[];
+}
+
+export interface OpenAIFunctionTool {
+  type: "function";
+  function: {
+    name: string;
+    description?: string;
+    parameters?: Record<string, unknown>;
+  };
 }
 
 export interface OpenAIChatRequest {
@@ -18,6 +30,8 @@ export interface OpenAIChatRequest {
   messages: OpenAIChatMessage[];
   stream?: boolean;
   reasoning_effort?: string;
+  tools?: OpenAIFunctionTool[];
+  tool_choice?: "none" | "auto" | "required" | Record<string, unknown>;
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
@@ -49,10 +63,10 @@ export interface OpenAIChatResponseChoice {
   index: number;
   message: {
     role: "assistant";
-    content: string;
+    content: string | null;
     tool_calls?: OpenAIToolCall[];
   };
-  finish_reason: "stop" | "length" | "content_filter" | null;
+  finish_reason: "stop" | "length" | "content_filter" | "tool_calls" | null;
 }
 
 export interface OpenAIChatResponse {
@@ -77,7 +91,7 @@ export interface OpenAIChatChunkDelta {
 export interface OpenAIChatChunkChoice {
   index: number;
   delta: OpenAIChatChunkDelta;
-  finish_reason: "stop" | "length" | "content_filter" | null;
+  finish_reason: "stop" | "length" | "content_filter" | "tool_calls" | null;
 }
 
 export interface OpenAIChatChunk {

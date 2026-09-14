@@ -33,3 +33,25 @@ Codex writes one JSON object per stdout line. The proxy consumes:
 
 Other event types are ignored by the HTTP adapter. Diagnostics from stderr are
 returned when the process exits without a completed turn.
+
+## Agent bridge protocol
+
+When a Chat Completions request contains OpenAI function `tools`, the proxy
+starts an ephemeral `codex app-server` process and enables its experimental
+API. The thread uses the requested model, `read-only` sandboxing, and a safe
+server-side working directory. OpenAI function definitions are passed as App
+Server `dynamicTools`.
+
+When Codex sends an `item/tool/call` server request, the proxy returns it to the
+HTTP client as an assistant `tool_calls` response with
+`finish_reason: "tool_calls"`. The App Server process stays alive. The client
+executes the tool locally, applies its own folder restrictions and approval
+flow, then sends a `role: "tool"` message with the matching `tool_call_id`.
+The proxy forwards the result to App Server and waits for the next tool call or
+the final agent message.
+
+Built-in App Server command and file-change approval requests are declined.
+This prevents agent bridge turns from operating on the proxy repository. A
+pending bridge turn expires after 15 minutes and is also discarded when the
+service restarts. If Codex requests several tools together, the client must
+return all of those tool outputs in the same follow-up HTTP request.

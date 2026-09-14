@@ -1,8 +1,10 @@
 # Panduan Penggunaan Codex API Proxy melalui Tailscale
 
 Dokumen ini menjelaskan cara memakai Codex API Proxy milik tim dari perangkat
-lain melalui jaringan privat Tailscale. Proxy menyediakan sebagian antarmuka
-OpenAI Chat Completions dan menjalankan Codex CLI pada komputer server.
+lain melalui jaringan privat Tailscale. Proxy menyediakan antarmuka OpenAI
+Chat Completions dan agent bridge berbasis function calling. Codex berjalan
+pada server, sedangkan tool untuk membaca repository, mengubah file, dan
+menjalankan terminal tetap berjalan pada perangkat klien.
 
 Terakhir diperbarui: 14 September 2026.
 
@@ -31,13 +33,23 @@ Perangkat rekan
     -> HTTPS melalui Tailscale
     -> Tailscale Serve pada server
     -> Codex API Proxy di 127.0.0.1:3456
-    -> codex exec
+    -> codex exec untuk chat biasa
+       atau Codex App Server untuk Agent mode
     -> layanan OpenAI menggunakan sesi Codex milik server
+
+Pada Agent mode:
+Codex -> tool_calls -> proxy -> klien menjalankan tool lokal
+      <- hasil tool  <- proxy <- persetujuan pengguna di perangkat klien
 ```
 
 API key pada panduan ini melindungi proxy. Key tersebut bukan OpenAI API key.
 Semua pemakaian model menggunakan autentikasi dan kuota Codex yang terpasang
 pada komputer server.
+
+Login Codex, token sesi ChatGPT, dan konfigurasi autentikasi Codex tidak
+dikirim ke perangkat klien. Klien hanya menerima API key proxy. Isi prompt,
+file yang dibaca oleh tool lokal, dan hasil terminal tetap diteruskan melalui
+proxy ke Codex agar model dapat mengerjakan tugasnya.
 
 ## Prasyarat perangkat klien
 
@@ -311,7 +323,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "id": "codex",
         "name": "Codex CLI Default",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
-        "toolCalling": false,
+        "toolCalling": true,
         "vision": false,
         "streaming": true,
         "thinking": true,
@@ -324,7 +336,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "id": "gpt-5.6-terra",
         "name": "Codex 5.6 Terra",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
-        "toolCalling": false,
+        "toolCalling": true,
         "vision": false,
         "streaming": true,
         "thinking": true,
@@ -337,7 +349,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "id": "gpt-5.6-luna",
         "name": "Codex 5.6 Luna",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
-        "toolCalling": false,
+        "toolCalling": true,
         "vision": false,
         "streaming": true,
         "thinking": true,
@@ -357,20 +369,17 @@ input variable atau penyimpanan rahasia yang disediakan UI:
 
 - <https://code.visualstudio.com/docs/agent-customization/language-models>
 
-### Batasan integrasi VS Code
+### Agent mode di VS Code
 
-Konfigurasi Custom Endpoint menyediakan model untuk Chat/BYOK VS Code. Proxy
-saat ini tidak menghasilkan OpenAI `tool_calls`, sehingga `toolCalling` harus
-tetap `false`. Model mungkin tidak tersedia untuk Agent mode yang mensyaratkan
-tool calling.
+`toolCalling: true` memberi tahu VS Code bahwa endpoint dapat meminta function
+tools. Pada Agent mode, VS Code menentukan tool yang tersedia, membatasi akses
+ke workspace yang dibuka, meminta persetujuan sesuai pengaturan lokal, lalu
+mengirim hasil tool kembali ke proxy. Dukungan persisnya bergantung pada versi
+VS Code dan fitur Custom Endpoint yang digunakan.
 
-Endpoint juga tidak dapat membaca file yang berada di perangkat klien hanya
-karena file tersebut sedang dibuka di VS Code. Prompt diproses oleh Codex CLI
-di komputer server.
-
-Untuk pengalaman coding agent penuh pada file server, gunakan VS Code Remote
-SSH melalui Tailscale, buka proyek di server, lalu jalankan Codex CLI atau
-ekstensi Codex di sesi remote.
+Pada Chat mode tanpa tools, model hanya mengetahui isi prompt dan konteks yang
+dilampirkan VS Code. Pastikan folder proyek rekan dibuka sebagai workspace dan
+pilih Agent mode jika model harus menjelajah atau mengubah proyek tersebut.
 
 ## Konfigurasi Continue
 
@@ -393,6 +402,8 @@ models:
       - chat
       - edit
       - apply
+    capabilities:
+      - tool_use
 
   - name: GPT-5.6 Terra
     provider: openai
@@ -403,6 +414,8 @@ models:
       - chat
       - edit
       - apply
+    capabilities:
+      - tool_use
     requestOptions:
       extraBodyProperties:
         reasoning_effort: medium
@@ -413,9 +426,10 @@ salin blok kedua lalu ganti `name` dan `model` dengan ID dari tabel model.
 `requestOptions.extraBodyProperties.reasoning_effort` bersifat opsional dan
 dapat diisi `low`, `medium`, `high`, `xhigh`, atau `max` sesuai model.
 
-Proxy belum mengirim OpenAI `tool_calls`, jadi jangan menambahkan capability
-`tool_use`. Chat, Edit, dan Apply tetap dapat memakai respons teks, sedangkan
-Agent mode Continue yang memerlukan tool calling belum didukung.
+Capability `tool_use` mengaktifkan Agent mode Continue. Buka repository rekan
+sebagai workspace, pilih model proxy, lalu gunakan Agent mode. Continue
+menjalankan tool pada perangkat klien dan menampilkan permintaan izin terminal
+atau perubahan file sesuai konfigurasi Continue di perangkat tersebut.
 
 ## Penggunaan dengan OpenAI SDK
 
@@ -473,10 +487,12 @@ Field permintaan yang digunakan:
 | Field | Status | Keterangan |
 | --- | --- | --- |
 | `model` | Wajib | `codex` atau ID model eksplisit |
-| `messages` | Wajib | Array pesan dengan role `system`, `user`, atau `assistant` |
+| `messages` | Wajib | Array pesan dengan role `system`, `user`, `assistant`, atau `tool` |
 | `stream` | Opsional | Aktifkan SSE dengan nilai `true` |
 | `user` | Opsional | Kunci sesi untuk melanjutkan thread Codex |
 | `reasoning_effort` | Opsional | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, atau `max`; alias `light` dan `extra-high` juga diterima |
+| `tools` | Opsional | Daftar function tools OpenAI; mengaktifkan agent bridge |
+| `tool_choice` | Opsional | `auto`, `required`, atau `none`; `none` mematikan agent bridge untuk request awal |
 | `temperature` | Diabaikan | Tidak diteruskan ke Codex CLI |
 | `top_p` | Diabaikan | Tidak diteruskan ke Codex CLI |
 | `max_tokens` | Diabaikan | Tidak diteruskan ke Codex CLI |
@@ -484,19 +500,19 @@ Field permintaan yang digunakan:
 | `presence_penalty` | Diabaikan | Tidak diteruskan ke Codex CLI |
 
 Content yang didukung adalah teks biasa serta blok `text` atau `input_text`.
-Gambar, audio, embeddings, Responses API, structured outputs, dan tool calls
-belum didukung oleh proxy ini.
+Function tool calls dan pesan hasil tool didukung. Gambar, audio, embeddings,
+Responses API, dan structured outputs belum didukung oleh proxy ini.
 
-## Ruang kerja dan izin Codex
+## Ruang kerja dan izin
 
-Codex CLI dijalankan pada komputer server, bukan pada perangkat klien. Ruang
-kerjanya ditentukan oleh `CODEX_WORKING_DIR`; pada deployment saat ini service
-berjalan dari direktori repositori proxy.
+Untuk chat biasa, Codex CLI berjalan pada komputer server dengan sandbox
+`read-only`; ruang kerjanya ditentukan oleh `CODEX_WORKING_DIR`.
 
-Sandbox default adalah `read-only`. Codex dapat membaca file dalam ruang kerja
-yang diizinkan, tetapi tidak dapat mengubah file. Perubahan izin sandbox harus
-dilakukan oleh pengelola server setelah mempertimbangkan siapa saja yang dapat
-mengakses endpoint.
+Untuk request yang menyertakan `tools`, agent bridge memakai direktori server
+yang terisolasi dan menolak tool file/terminal bawaan server. Codex hanya
+meminta function tools yang diumumkan klien. Karena itu file proyek tetap berada
+di perangkat rekan. Continue atau VS Code menjalankan tool pada workspace yang
+sedang dibuka dan mengendalikan batas folder serta persetujuan terminal lokal.
 
 ## Kode status dan pemecahan masalah
 
@@ -549,8 +565,7 @@ batas waktu. Kirim pesan error lengkap dan waktu kejadian kepada pengelola.
 1. Pastikan JSON valid dan tidak memiliki koma berlebih.
 2. Jalankan **Developer: Reload Window**.
 3. Buka **Chat: Manage Language Models** dan pastikan model tidak disembunyikan.
-4. Ingat bahwa model dengan `toolCalling: false` tidak tersedia pada mode agent
-   yang mensyaratkan tool calling.
+4. Pastikan model memakai `toolCalling: true` untuk mode agent.
 
 ## Operasional untuk pengelola server
 
@@ -625,22 +640,23 @@ rahasia. Semua konfigurasi klien dengan key lama akan menerima HTTP `401`.
 
 ## Batasan penting
 
-Proxy ini memberikan kompatibilitas Chat Completions untuk teks. Proxy ini
-bukan pengganti penuh protokol Codex CLI, Codex app-server, atau ekstensi Codex.
-Kemampuan seperti persetujuan interaktif, tool calls yang dikendalikan klien,
-input gambar, sinkronisasi file perangkat klien, dan kontrol sandbox per
-permintaan belum tersedia.
+Agent bridge memakai fitur dynamic tools Codex App Server yang masih
+eksperimental. Pending tool call disimpan di memori selama maksimal 15 menit;
+restart service membuat `tool_call_id` lama kedaluwarsa. Jika model meminta
+beberapa tool sekaligus, klien harus mengirim semua hasilnya dalam satu request.
 
-Untuk chat, gunakan endpoint ini. Untuk pengalaman penuh yang dapat membaca dan
-mengedit repository, gunakan Codex langsung pada perangkat tempat repository
-berada atau buka repository server melalui VS Code Remote SSH di atas
-Tailscale.
+Proxy tidak memasang tool langsung pada perangkat klien. Pengalaman agent
+bergantung pada Continue, VS Code, atau klien lain yang benar-benar menyediakan
+function tools dan alur persetujuan. Input gambar dan kompatibilitas penuh
+dengan seluruh ekstensi belum tersedia.
 
 ## Referensi
 
 - Model Codex: <https://developers.openai.com/codex/models>
 - Model OpenAI: <https://developers.openai.com/api/docs/models>
 - Codex IDE extension: <https://developers.openai.com/codex/ide>
+- Codex App Server: <https://developers.openai.com/codex/app-server>
+- Continue Agent mode: <https://docs.continue.dev/features/agent/how-it-works>
 - Custom Endpoint VS Code: <https://code.visualstudio.com/docs/agent-customization/language-models>
 - Tailscale Serve: <https://tailscale.com/docs/reference/tailscale-cli/serve>
 - Tailscale SSH: <https://tailscale.com/docs/features/tailscale-ssh>

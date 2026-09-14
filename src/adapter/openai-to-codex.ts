@@ -47,7 +47,8 @@ export function extractModel(model?: string): { cliModel?: string; responseModel
   return { cliModel: stripped, responseModel: stripped };
 }
 
-function extractText(content: string | OpenAIContentBlock[]): string {
+function extractText(content: string | OpenAIContentBlock[] | null): string {
+  if (content === null) return "";
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return String(content || "");
   return content
@@ -62,6 +63,10 @@ export function messagesToPrompt(messages: OpenAIChatRequest["messages"]): strin
       const text = extractText(message.content);
       if (message.role === "system") return `<system>\n${text}\n</system>`;
       if (message.role === "assistant") return `<previous_response>\n${text}\n</previous_response>`;
+      if (message.role === "tool") {
+        const tool = message.name || message.tool_call_id || "tool";
+        return `<tool_result name="${tool}">\n${text}\n</tool_result>`;
+      }
       return text;
     })
     .join("\n\n")

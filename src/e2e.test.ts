@@ -11,6 +11,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { startServer, stopServer } from "./server/index.js";
+import { shutdownAgentBridges } from "./subprocess/agent-bridge.js";
 import type { Server } from "http";
 import type { AddressInfo } from "net";
 
@@ -29,6 +30,7 @@ before(async () => {
 });
 
 after(async () => {
+  shutdownAgentBridges();
   await stopServer();
 });
 
@@ -84,6 +86,60 @@ describe("health and models", () => {
 // ─── Non-streaming completion ───────────────────────────────────────
 
 describe("non-streaming completion", { timeout: TEST_TIMEOUT, skip: !RUN_LIVE }, () => {
+  it("bridges a client function tool through Codex app-server", async () => {
+    const tools = [{
+      type: "function",
+      function: {
+        name: "client_echo",
+        description: "Returns the supplied text from the client. Use it when asked to echo.",
+        parameters: {
+          type: "object",
+          properties: { text: { type: "string" } },
+          required: ["text"],
+          additionalProperties: false,
+        },
+      },
+    }];
+    const userMessage = {
+      role: "user",
+      content: "Call client_echo with HELLO and then reply with its returned text only.",
+    };
+    const first = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-5.6-luna",
+        reasoning_effort: "low",
+        messages: [userMessage],
+        tools,
+      }),
+    });
+    assert.equal(first.status, 200);
+    const firstBody = await first.json() as any;
+    assert.equal(firstBody.choices[0].finish_reason, "tool_calls");
+    const toolCall = firstBody.choices[0].message.tool_calls[0];
+    assert.equal(toolCall.function.name, "client_echo");
+
+    const second = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-5.6-luna",
+        reasoning_effort: "low",
+        messages: [
+          userMessage,
+          firstBody.choices[0].message,
+          { role: "tool", tool_call_id: toolCall.id, content: "CLIENT-BRIDGE-OK" },
+        ],
+        tools,
+      }),
+    });
+    assert.equal(second.status, 200);
+    const secondBody = await second.json() as any;
+    assert.equal(secondBody.choices[0].finish_reason, "stop");
+    assert.match(secondBody.choices[0].message.content, /CLIENT-BRIDGE-OK/);
+  });
+
   it("returns a valid OpenAI response for a simple prompt", async () => {
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
@@ -185,6 +241,40 @@ describe("non-streaming completion", { timeout: TEST_TIMEOUT, skip: !RUN_LIVE },
 // ─── Streaming completion ───────────────────────────────────────────
 
 describe("streaming completion", { timeout: TEST_TIMEOUT, skip: !RUN_LIVE }, () => {
+  it("streams an OpenAI-compatible client tool call", async () => {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-5.6-luna",
+        reasoning_effort: "low",
+        stream: true,
+        messages: [{ role: "user", content: "Call client_echo with STREAM." }],
+        tools: [{
+          type: "function",
+          function: {
+            name: "client_echo",
+            description: "Returns text from the client. Always use it for echo requests.",
+            parameters: {
+              type: "object",
+              properties: { text: { type: "string" } },
+              required: ["text"],
+            },
+          },
+        }],
+      }),
+    });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") || "", /text\/event-stream/);
+    const events = (await res.text())
+      .split("\n")
+      .filter((line) => line.startsWith("data: {") )
+      .map((line) => JSON.parse(line.slice(6)));
+    const toolChunk = events.find((event) => event.choices?.[0]?.delta?.tool_calls?.length);
+    assert.equal(toolChunk.choices[0].delta.tool_calls[0].function.name, "client_echo");
+    assert.ok(events.some((event) => event.choices?.[0]?.finish_reason === "tool_calls"));
+  });
+
   it("returns valid SSE chunks with usage in final chunk", async () => {
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",
