@@ -176,15 +176,15 @@ dan tahap rollout akun yang digunakan komputer server.
 | `gpt-5.6` | Alias praktis GPT-5.6 | Saat ini merupakan alias untuk `gpt-5.6-sol` |
 | `gpt-5.6-terra` | Pekerjaan harian dengan keseimbangan kemampuan dan biaya | Pilihan umum yang seimbang |
 | `gpt-5.6-luna` | Tugas jelas, berulang, cepat, atau bervolume tinggi | Pilihan paling hemat pada keluarga GPT-5.6 |
+| `gpt-5.5` | Coding dan pekerjaan umum generasi sebelumnya | Gunakan bila kompatibilitas dengan perilaku GPT-5.5 diperlukan |
 | `gpt-5.3-codex-spark` | Iterasi coding teks dengan latensi sangat rendah | Research preview dan tersedia untuk akun ChatGPT Pro yang memenuhi syarat |
 
 Gunakan `codex` jika tidak yakin. Alias tersebut membuat server memakai pilihan
 default yang memang tersedia untuk akun server. Jika model eksplisit tidak
 tersedia, Codex CLI akan mengembalikan error.
 
-Endpoint `GET /v1/models` saat ini hanya mengiklankan alias `codex`. Model
-eksplisit pada tabel tetap dapat dikirim pada body permintaan karena proxy
-meneruskannya langsung ke Codex CLI.
+Endpoint `GET /v1/models` mengiklankan alias `codex` dan seluruh ID model pada
+tabel. Model eksplisit diteruskan langsung ke `codex exec --model`.
 
 Contoh memilih model eksplisit:
 
@@ -371,6 +371,51 @@ di komputer server.
 Untuk pengalaman coding agent penuh pada file server, gunakan VS Code Remote
 SSH melalui Tailscale, buka proyek di server, lalu jalankan Codex CLI atau
 ekstensi Codex di sesi remote.
+
+## Konfigurasi Continue
+
+Untuk ekstensi Continue, setiap model memakai `provider: openai` dan base URL
+yang berhenti pada `/v1`. Tulis URL mentah sebagai nilai YAML; jangan salin
+format tautan Markdown `[URL](URL)`.
+
+```yaml
+name: Main Config
+version: 1.0.0
+schema: v1
+
+models:
+  - name: Codex Default
+    provider: openai
+    model: codex
+    apiBase: https://spark-2209.tail921925.ts.net:8443/v1
+    apiKey: YOUR_CODEX_PROXY_API_KEY
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: GPT-5.6 Terra
+    provider: openai
+    model: gpt-5.6-terra
+    apiBase: https://spark-2209.tail921925.ts.net:8443/v1
+    apiKey: YOUR_CODEX_PROXY_API_KEY
+    roles:
+      - chat
+      - edit
+      - apply
+    requestOptions:
+      extraBodyProperties:
+        reasoning_effort: medium
+```
+
+Ganti `YOUR_CODEX_PROXY_API_KEY` dengan key proxy asli. Untuk menambah model,
+salin blok kedua lalu ganti `name` dan `model` dengan ID dari tabel model.
+`requestOptions.extraBodyProperties.reasoning_effort` bersifat opsional dan
+dapat diisi `low`, `medium`, `high`, `xhigh`, atau `max` sesuai model.
+
+Proxy belum mengirim OpenAI `tool_calls`, jadi jangan menambahkan capability
+`tool_use`. Chat, Edit, dan Apply tetap dapat memakai respons teks, sedangkan
+Agent mode Continue yang memerlukan tool calling belum didukung.
 
 ## Penggunaan dengan OpenAI SDK
 

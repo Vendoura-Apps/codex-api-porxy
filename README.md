@@ -52,7 +52,8 @@ For SSE, add `"stream":true` to the JSON body and use `curl -N`.
 
 The `codex` model alias uses the model selected by Codex CLI configuration.
 You may also pass an explicit model ID; the proxy forwards it through
-`codex exec --model`.
+`codex exec --model`. `GET /v1/models` advertises the explicit model choices
+configured for the server so clients can populate their model picker.
 
 Set `reasoning_effort` per request to `none`, `minimal`, `low`, `medium`,
 `high`, `xhigh`, or `max`. The aliases `light` and `extra-high` map to `low`

@@ -21,6 +21,18 @@ interface SessionContext {
   messageCount: number;
 }
 
+/** Model IDs available through the authenticated Codex CLI on this server. */
+export const AVAILABLE_MODEL_IDS = [
+  "codex",
+  "gpt-6-astra",
+  "gpt-5.6-sol",
+  "gpt-5.6",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "gpt-5.5",
+  "gpt-5.3-codex-spark",
+] as const;
+
 function resolveCliInput(body: OpenAIChatRequest): { input: CodexInput; session: SessionContext } {
   const sessionKey = body.user;
   const existing = sessionKey ? getSession(sessionKey) : undefined;
@@ -222,12 +234,12 @@ async function handleNonStreamingResponse(
 export function handleModels(_req: Request, res: Response): void {
   res.json({
     object: "list",
-    data: [{
-      id: "codex",
+    data: AVAILABLE_MODEL_IDS.map((id) => ({
+      id,
       object: "model",
       owned_by: "openai",
       created: Math.floor(Date.now() / 1000),
-    }],
+    })),
   });
 }
 
