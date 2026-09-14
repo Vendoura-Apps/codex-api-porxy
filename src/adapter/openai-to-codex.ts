@@ -6,7 +6,37 @@ export interface CodexInput {
   prompt: string;
   /** Undefined means: use the model configured by Codex CLI. */
   model?: string;
+  /** Undefined means: use the reasoning effort configured by Codex CLI. */
+  reasoningEffort?: CodexReasoningEffort;
   responseModel: string;
+}
+
+export type CodexReasoningEffort =
+  | "none"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
+
+const REASONING_EFFORTS: Readonly<Record<string, CodexReasoningEffort>> = {
+  none: "none",
+  minimal: "minimal",
+  light: "low",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  "extra-high": "xhigh",
+  extra_high: "xhigh",
+  "extra high": "xhigh",
+  xhigh: "xhigh",
+  max: "max",
+};
+
+export function normalizeReasoningEffort(value: unknown): CodexReasoningEffort | undefined {
+  if (typeof value !== "string") return undefined;
+  return REASONING_EFFORTS[value.trim().toLowerCase()];
 }
 
 export function extractModel(model?: string): { cliModel?: string; responseModel: string } {
@@ -39,13 +69,18 @@ export function messagesToPrompt(messages: OpenAIChatRequest["messages"]): strin
 }
 
 export function openaiToCodex(request: OpenAIChatRequest): CodexInput {
-  return { prompt: messagesToPrompt(request.messages), ...extractModel(request.model) };
+  return {
+    prompt: messagesToPrompt(request.messages),
+    reasoningEffort: normalizeReasoningEffort(request.reasoning_effort),
+    ...extractModel(request.model),
+  };
 }
 
 export function openaiToCodexDelta(request: OpenAIChatRequest, sinceIndex: number): CodexInput {
   const appended = request.messages.slice(sinceIndex).filter((message) => message.role !== "assistant");
   return {
     prompt: messagesToPrompt(appended.length ? appended : request.messages),
+    reasoningEffort: normalizeReasoningEffort(request.reasoning_effort),
     ...extractModel(request.model),
   };
 }

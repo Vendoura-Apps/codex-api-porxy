@@ -114,6 +114,7 @@ curl --fail --silent --show-error \
   -H "Content-Type: application/json" \
   -d '{
     "model": "codex",
+    "reasoning_effort": "high",
     "messages": [
       {
         "role": "user",
@@ -206,6 +207,39 @@ mendistribusikan ulang daftar ini:
 - <https://developers.openai.com/codex/models>
 - <https://developers.openai.com/api/docs/models>
 
+## Mengatur reasoning effort
+
+Tambahkan field `reasoning_effort` pada setiap request untuk mengatur banyaknya
+penalaran yang digunakan Codex pada turn tersebut:
+
+```json
+{
+  "model": "codex",
+  "reasoning_effort": "high",
+  "messages": [
+    {"role": "user", "content": "Analisis penyebab bug ini secara teliti."}
+  ]
+}
+```
+
+Nilai yang diterima proxy:
+
+| Tampilan/nilai API | Nilai yang dikirim ke Codex | Catatan |
+| --- | --- | --- |
+| `none` | `none` | Tanpa reasoning tambahan; hanya model tertentu |
+| `minimal` | `minimal` | Reasoning paling sedikit; hanya model tertentu |
+| `light` atau `low` | `low` | Pilihan ringan dan cepat |
+| `medium` | `medium` | Keseimbangan kecepatan dan penalaran |
+| `high` | `high` | Penalaran lebih dalam |
+| `extra-high`, `extra_high`, `extra high`, atau `xhigh` | `xhigh` | Nama CLI untuk Extra High |
+| `max` | `max` | Tingkat tertinggi pada model yang mendukungnya |
+
+Jika field ini tidak dikirim, proxy mengikuti `model_reasoning_effort` pada
+konfigurasi Codex CLI server. Tidak semua model mendukung semua tingkat; bila
+kombinasinya tidak tersedia, Codex CLI akan mengembalikan error. `ultra` bukan
+nilai reasoning effort per request karena mode tersebut mengatur orkestrasi
+multi-agent Codex.
+
 ## Streaming SSE
 
 Tambahkan `"stream": true` dan gunakan `curl -N`:
@@ -280,6 +314,9 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "toolCalling": false,
         "vision": false,
         "streaming": true,
+        "thinking": true,
+        "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
+        "reasoningEffortFormat": "chat-completions",
         "maxInputTokens": 128000,
         "maxOutputTokens": 16000
       },
@@ -290,6 +327,9 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "toolCalling": false,
         "vision": false,
         "streaming": true,
+        "thinking": true,
+        "supportsReasoningEffort": ["none", "low", "medium", "high", "xhigh", "max"],
+        "reasoningEffortFormat": "chat-completions",
         "maxInputTokens": 128000,
         "maxOutputTokens": 16000
       },
@@ -300,6 +340,9 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "toolCalling": false,
         "vision": false,
         "streaming": true,
+        "thinking": true,
+        "supportsReasoningEffort": ["none", "low", "medium", "high", "xhigh", "max"],
+        "reasoningEffortFormat": "chat-completions",
         "maxInputTokens": 128000,
         "maxOutputTokens": 16000
       }
@@ -388,6 +431,7 @@ Field permintaan yang digunakan:
 | `messages` | Wajib | Array pesan dengan role `system`, `user`, atau `assistant` |
 | `stream` | Opsional | Aktifkan SSE dengan nilai `true` |
 | `user` | Opsional | Kunci sesi untuk melanjutkan thread Codex |
+| `reasoning_effort` | Opsional | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, atau `max`; alias `light` dan `extra-high` juga diterima |
 | `temperature` | Diabaikan | Tidak diteruskan ke Codex CLI |
 | `top_p` | Diabaikan | Tidak diteruskan ke Codex CLI |
 | `max_tokens` | Diabaikan | Tidak diteruskan ke Codex CLI |

@@ -8,8 +8,13 @@ describe("CodexSubprocess", () => {
     const subprocess = new CodexSubprocess() as unknown as {
       buildArgs: (options: object) => string[];
     };
-    assert.deepEqual(subprocess.buildArgs({ model: "gpt-example", sandbox: "read-only" }), [
-      "exec", "--json", "--model", "gpt-example", "--color", "never",
+    assert.deepEqual(subprocess.buildArgs({
+      model: "gpt-example",
+      reasoningEffort: "xhigh",
+      sandbox: "read-only",
+    }), [
+      "exec", "--json", "--model", "gpt-example",
+      "--config", "model_reasoning_effort=\"xhigh\"", "--color", "never",
       "--sandbox", "read-only", "-",
     ]);
   });

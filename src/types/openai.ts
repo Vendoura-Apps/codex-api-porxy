@@ -17,6 +17,7 @@ export interface OpenAIChatRequest {
   model: string;
   messages: OpenAIChatMessage[];
   stream?: boolean;
+  reasoning_effort?: string;
   temperature?: number;
   max_tokens?: number;
   top_p?: number;

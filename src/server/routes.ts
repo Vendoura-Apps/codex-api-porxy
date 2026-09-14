@@ -3,7 +3,12 @@
 import type { Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 import { CodexSubprocess } from "../subprocess/manager.js";
-import { openaiToCodex, openaiToCodexDelta, type CodexInput } from "../adapter/openai-to-codex.js";
+import {
+  normalizeReasoningEffort,
+  openaiToCodex,
+  openaiToCodexDelta,
+  type CodexInput,
+} from "../adapter/openai-to-codex.js";
 import { createDoneChunk, createTextChunk, codexResultToOpenai } from "../adapter/codex-to-openai.js";
 import { clearSession, getSession, setSession } from "../subprocess/session-store.js";
 import type { OpenAIChatRequest } from "../types/openai.js";
@@ -46,6 +51,17 @@ export async function handleChatCompletions(req: Request, res: Response): Promis
         message: "messages is required and must be a non-empty array",
         type: "invalid_request_error",
         code: "invalid_messages",
+      },
+    });
+    return;
+  }
+
+  if (body.reasoning_effort !== undefined && !normalizeReasoningEffort(body.reasoning_effort)) {
+    res.status(400).json({
+      error: {
+        message: "reasoning_effort must be one of: none, minimal, light, low, medium, high, extra-high, xhigh, max",
+        type: "invalid_request_error",
+        code: "invalid_reasoning_effort",
       },
     });
     return;
@@ -151,6 +167,7 @@ async function handleStreamingResponse(
 
     subprocess.start(input.prompt, {
       model: input.model,
+      reasoningEffort: input.reasoningEffort,
       threadId: session.threadId,
       resume: session.resume,
     }).catch((error: Error) => {
@@ -195,6 +212,7 @@ async function handleNonStreamingResponse(
     });
     subprocess.start(input.prompt, {
       model: input.model,
+      reasoningEffort: input.reasoningEffort,
       threadId: session.threadId,
       resume: session.resume,
     }).catch((error: Error) => sendError(error.message));

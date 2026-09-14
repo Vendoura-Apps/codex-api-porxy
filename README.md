@@ -45,7 +45,7 @@ node dist/server/standalone.js 8080
 ```bash
 curl http://127.0.0.1:3456/v1/chat/completions \
   -H 'Content-Type: application/json' \
-  -d '{"model":"codex","messages":[{"role":"user","content":"Hello"}]}'
+  -d '{"model":"codex","reasoning_effort":"high","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
 For SSE, add `"stream":true` to the JSON body and use `curl -N`.
@@ -53,6 +53,11 @@ For SSE, add `"stream":true` to the JSON body and use `curl -N`.
 The `codex` model alias uses the model selected by Codex CLI configuration.
 You may also pass an explicit model ID; the proxy forwards it through
 `codex exec --model`.
+
+Set `reasoning_effort` per request to `none`, `minimal`, `low`, `medium`,
+`high`, `xhigh`, or `max`. The aliases `light` and `extra-high` map to `low`
+and `xhigh`. Availability depends on the selected model; omitting the field
+uses the Codex CLI configuration. `ultra` is not a reasoning-effort value.
 
 ## Conversation sessions
 
@@ -121,6 +126,7 @@ npm run test:e2e
   token by token.
 - Codex handles its tools internally. Tool calls are not forwarded to clients.
 - Sampling fields such as `temperature` and `top_p` are not forwarded.
+- `reasoning_effort` is forwarded to Codex CLI as `model_reasoning_effort`.
 
 ## License
 

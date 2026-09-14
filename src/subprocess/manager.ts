@@ -4,6 +4,7 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
 import path from "node:path";
 import type { CodexEvent, CodexResult, CodexUsage } from "../types/codex-cli.js";
+import type { CodexReasoningEffort } from "../adapter/openai-to-codex.js";
 import {
   failureMessage,
   isAgentMessage,
@@ -16,6 +17,7 @@ export type CodexSandbox = "read-only" | "workspace-write" | "danger-full-access
 
 export interface SubprocessOptions {
   model?: string;
+  reasoningEffort?: CodexReasoningEffort;
   threadId?: string;
   resume?: boolean;
   cwd?: string;
@@ -122,6 +124,9 @@ export class CodexSubprocess extends EventEmitter {
     const sandbox = options.sandbox || parseSandbox(process.env.CODEX_SANDBOX) || DEFAULT_SANDBOX;
     const common = ["--json"];
     if (options.model) common.push("--model", options.model);
+    if (options.reasoningEffort) {
+      common.push("--config", `model_reasoning_effort="${options.reasoningEffort}"`);
+    }
     if (options.resume && options.threadId) {
       return ["exec", "--sandbox", sandbox, "resume", ...common, options.threadId, "-"];
     }

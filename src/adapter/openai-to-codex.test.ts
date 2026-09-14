@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { extractModel, messagesToPrompt, openaiToCodexDelta } from "./openai-to-codex.js";
+import {
+  extractModel,
+  messagesToPrompt,
+  normalizeReasoningEffort,
+  openaiToCodex,
+  openaiToCodexDelta,
+} from "./openai-to-codex.js";
 
 describe("OpenAI to Codex adapter", () => {
   it("uses the CLI default model for the codex alias", () => {
@@ -32,5 +38,21 @@ describe("OpenAI to Codex adapter", () => {
       ],
     }, 1);
     assert.equal(input.prompt, "second");
+  });
+
+  it("normalizes Codex UI reasoning effort names", () => {
+    assert.equal(normalizeReasoningEffort("light"), "low");
+    assert.equal(normalizeReasoningEffort("Extra High"), "xhigh");
+    assert.equal(normalizeReasoningEffort("max"), "max");
+    assert.equal(normalizeReasoningEffort("ultra"), undefined);
+  });
+
+  it("adds a normalized reasoning effort to Codex input", () => {
+    const input = openaiToCodex({
+      model: "codex",
+      reasoning_effort: "extra-high",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    assert.equal(input.reasoningEffort, "xhigh");
   });
 });
