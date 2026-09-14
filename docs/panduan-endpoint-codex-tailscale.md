@@ -4,16 +4,16 @@ Dokumen ini menjelaskan cara memakai Codex API Proxy milik tim dari perangkat
 lain melalui jaringan privat Tailscale. Proxy menyediakan sebagian antarmuka
 OpenAI Chat Completions dan menjalankan Codex CLI pada komputer server.
 
-Terakhir diperbarui: 13 September 2026.
+Terakhir diperbarui: 14 September 2026.
 
 ## Ringkasan koneksi
 
 | Pengaturan | Nilai |
 | --- | --- |
-| Base URL | `https://spark-2209.tail7b9424.ts.net:8443/v1` |
-| Chat Completions | `https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions` |
-| Daftar model | `https://spark-2209.tail7b9424.ts.net:8443/v1/models` |
-| Health check | `https://spark-2209.tail7b9424.ts.net:8443/health` |
+| Base URL | `https://spark-2209.tail921925.ts.net:8443/v1` |
+| Chat Completions | `https://spark-2209.tail921925.ts.net:8443/v1/chat/completions` |
+| Daftar model | `https://spark-2209.tail921925.ts.net:8443/v1/models` |
+| Health check | `https://spark-2209.tail921925.ts.net:8443/health` |
 | API type | OpenAI-compatible Chat Completions |
 | Autentikasi | `Authorization: Bearer <API_KEY>` |
 | Model yang disarankan | `codex` |
@@ -65,7 +65,7 @@ Kemudian periksa endpoint kesehatan:
 
 ```bash
 curl --fail --silent --show-error \
-  https://spark-2209.tail7b9424.ts.net:8443/health
+  https://spark-2209.tail921925.ts.net:8443/health
 ```
 
 Respons yang diharapkan:
@@ -109,7 +109,7 @@ file konfigurasi yang ikut disinkronkan tanpa enkripsi.
 
 ```bash
 curl --fail --silent --show-error \
-  https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions \
+  https://spark-2209.tail921925.ts.net:8443/v1/chat/completions \
   -H "Authorization: Bearer $CODEX_PROXY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -129,7 +129,7 @@ Gunakan `curl.exe` agar sintaksnya tidak dialihkan ke cmdlet PowerShell:
 
 ```powershell
 curl.exe --fail --silent --show-error `
-  "https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions" `
+  "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions" `
   -H "Authorization: Bearer $env:CODEX_PROXY_API_KEY" `
   -H "Content-Type: application/json" `
   -d '{"model":"codex","messages":[{"role":"user","content":"Balas dengan kata OK"}]}'
@@ -189,7 +189,7 @@ Contoh memilih model eksplisit:
 
 ```bash
 curl --fail --silent --show-error \
-  https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions \
+  https://spark-2209.tail921925.ts.net:8443/v1/chat/completions \
   -H "Authorization: Bearer $CODEX_PROXY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -212,7 +212,7 @@ Tambahkan `"stream": true` dan gunakan `curl -N`:
 
 ```bash
 curl -N --fail --show-error \
-  https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions \
+  https://spark-2209.tail921925.ts.net:8443/v1/chat/completions \
   -H "Authorization: Bearer $CODEX_PROXY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -276,7 +276,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
       {
         "id": "codex",
         "name": "Codex CLI Default",
-        "url": "https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions",
+        "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": false,
         "vision": false,
         "streaming": true,
@@ -286,7 +286,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
       {
         "id": "gpt-5.6-terra",
         "name": "Codex 5.6 Terra",
-        "url": "https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions",
+        "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": false,
         "vision": false,
         "streaming": true,
@@ -296,7 +296,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
       {
         "id": "gpt-5.6-luna",
         "name": "Codex 5.6 Luna",
-        "url": "https://spark-2209.tail7b9424.ts.net:8443/v1/chat/completions",
+        "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": false,
         "vision": false,
         "streaming": true,
@@ -338,7 +338,7 @@ import os
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://spark-2209.tail7b9424.ts.net:8443/v1",
+    base_url="https://spark-2209.tail921925.ts.net:8443/v1",
     api_key=os.environ["CODEX_PROXY_API_KEY"],
 )
 
@@ -358,7 +358,7 @@ print(response.choices[0].message.content)
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  baseURL: "https://spark-2209.tail7b9424.ts.net:8443/v1",
+  baseURL: "https://spark-2209.tail921925.ts.net:8443/v1",
   apiKey: process.env.CODEX_PROXY_API_KEY,
 });
 
@@ -439,7 +439,7 @@ Periksa:
 ```bash
 tailscale status
 tailscale ping spark-2209
-curl -v https://spark-2209.tail7b9424.ts.net:8443/health
+curl -v https://spark-2209.tail921925.ts.net:8443/health
 ```
 
 Pastikan perangkat klien berada dalam tailnet yang benar dan server online.
