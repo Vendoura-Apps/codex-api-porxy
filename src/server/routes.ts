@@ -24,6 +24,7 @@ import {
 } from "../subprocess/agent-bridge.js";
 import type { OpenAIChatChunk, OpenAIChatRequest, OpenAIChatResponse } from "../types/openai.js";
 import type { CodexResult } from "../types/codex-cli.js";
+import { configuredCodexModel, modelMetadata } from "./model-catalog.js";
 
 interface SessionContext {
   sessionKey?: string;
@@ -409,6 +410,7 @@ async function handleNonStreamingResponse(
 }
 
 export function handleModels(_req: Request, res: Response): void {
+  const defaultModel = configuredCodexModel();
   res.json({
     object: "list",
     data: AVAILABLE_MODEL_IDS.map((id) => ({
@@ -416,6 +418,7 @@ export function handleModels(_req: Request, res: Response): void {
       object: "model",
       owned_by: "openai",
       created: Math.floor(Date.now() / 1000),
+      ...modelMetadata(id, defaultModel),
     })),
   });
 }

@@ -1,6 +1,7 @@
 /** Codex CLI provider and standalone server exports. */
 
 import { getServer, startServer, stopServer } from "./server/index.js";
+import { configuredCodexModel, modelMetadata } from "./server/model-catalog.js";
 import { verifyAuth, verifyCodex } from "./subprocess/manager.js";
 
 const PROVIDER_ID = "codex-cli";
@@ -46,6 +47,7 @@ const codexCliPlugin = {
             });
             serverPort = Number.parseInt(portInput, 10);
             await startServer({ port: serverPort });
+            const defaultCapabilities = modelMetadata("codex", configuredCodexModel());
             spin.stop("Codex CLI provider ready");
             return {
               profiles: [{
@@ -67,8 +69,8 @@ const codexCliPlugin = {
                         reasoning: true,
                         input: ["text"],
                         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-                        contextWindow: 200000,
-                        maxTokens: 8192,
+                        contextWindow: defaultCapabilities.context_window ?? 1_050_000,
+                        maxTokens: defaultCapabilities.max_output_tokens ?? 128_000,
                       }],
                     },
                   },

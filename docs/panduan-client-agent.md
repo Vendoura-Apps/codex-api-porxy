@@ -159,7 +159,7 @@ Jalankan **Chat: Manage Language Models**, pilih **Add Models**, lalu pilih
         "thinking": true,
         "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
         "reasoningEffortFormat": "chat-completions",
-        "maxInputTokens": 128000,
+        "maxInputTokens": 1050000,
         "maxOutputTokens": 16000
       },
       {
@@ -172,7 +172,7 @@ Jalankan **Chat: Manage Language Models**, pilih **Add Models**, lalu pilih
         "thinking": true,
         "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
         "reasoningEffortFormat": "chat-completions",
-        "maxInputTokens": 128000,
+        "maxInputTokens": 1050000,
         "maxOutputTokens": 16000
       }
     ]
@@ -224,6 +224,11 @@ Model yang diiklankan endpoint:
 
 Tidak semua model selalu tersedia untuk akun server. Gunakan `codex` jika model
 eksplisit menghasilkan error.
+
+Respons `GET /v1/models` juga menyertakan `resolved_model`, `context_window`,
+`max_output_tokens`, dan `auto_compact_threshold` jika kapasitas model diketahui.
+Client VTI memakai metadata ini untuk menentukan waktu compaction secara otomatis;
+alias `codex` mengikuti model default pada konfigurasi Codex CLI server.
 
 Nilai reasoning effort yang umum adalah `low`, `medium`, `high`, `xhigh`, dan
 `max`. Alias `light` dipetakan ke `low`, sedangkan `extra-high` dipetakan ke

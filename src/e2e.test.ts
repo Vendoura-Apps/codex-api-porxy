@@ -103,6 +103,10 @@ describe("health and models", () => {
       assert.equal(model.owned_by, "openai");
       assert.ok(typeof model.created === "number");
     }
+    const codex = body.data.find((model: any) => model.id === "codex");
+    assert.ok(typeof codex.resolved_model === "string");
+    assert.ok(typeof codex.context_window === "number");
+    assert.ok(typeof codex.auto_compact_threshold === "number");
   });
 
   it("returns 404 for unknown routes", async () => {

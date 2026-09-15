@@ -71,7 +71,10 @@ supported MIME types, limits, lifecycle, and structured errors.
 The `codex` model alias uses the model selected by Codex CLI configuration.
 You may also pass an explicit model ID; the proxy forwards it through
 `codex exec --model`. `GET /v1/models` advertises the explicit model choices
-configured for the server so clients can populate their model picker.
+configured for the server so clients can populate their model picker. Each
+entry also includes `resolved_model`, `context_window`, `max_output_tokens`,
+and `auto_compact_threshold` when known. The `codex` aliases resolve against
+the model in the server's Codex config.
 
 Set `reasoning_effort` per request to `none`, `minimal`, `low`, `medium`,
 `high`, `xhigh`, or `max`. The aliases `light` and `extra-high` map to `low`
@@ -99,6 +102,7 @@ six hours and reset when the server restarts.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `CODEX_BIN` | `codex` | Codex executable path |
+| `CODEX_DEFAULT_MODEL` | model from Codex `config.toml` | Override the resolved model metadata advertised for the `codex` alias |
 | `CODEX_WORKING_DIR` | server working directory | Repository Codex operates in |
 | `CODEX_SANDBOX` | `read-only` | `read-only`, `workspace-write`, or `danger-full-access` |
 | `CODEX_AGENT_BRIDGE_CWD` | isolated directory under the OS temp folder | Safe server-side directory used by agent bridge sessions |

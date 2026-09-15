@@ -203,7 +203,10 @@ default yang memang tersedia untuk akun server. Jika model eksplisit tidak
 tersedia, Codex CLI akan mengembalikan error.
 
 Endpoint `GET /v1/models` mengiklankan alias `codex` dan seluruh ID model pada
-tabel. Model eksplisit diteruskan langsung ke `codex exec --model`.
+tabel. Setiap model juga membawa `resolved_model`, `context_window`,
+`max_output_tokens`, dan `auto_compact_threshold` jika diketahui agar client
+dapat mengatur compaction secara dinamis. Model eksplisit diteruskan langsung
+ke `codex exec --model`.
 
 Contoh memilih model eksplisit:
 
@@ -357,7 +360,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "thinking": true,
         "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
         "reasoningEffortFormat": "chat-completions",
-        "maxInputTokens": 128000,
+        "maxInputTokens": 1050000,
         "maxOutputTokens": 16000
       },
       {
@@ -370,7 +373,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "thinking": true,
         "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
         "reasoningEffortFormat": "chat-completions",
-        "maxInputTokens": 128000,
+        "maxInputTokens": 1050000,
         "maxOutputTokens": 16000
       },
       {
@@ -383,7 +386,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "thinking": true,
         "supportsReasoningEffort": ["none", "low", "medium", "high", "xhigh", "max"],
         "reasoningEffortFormat": "chat-completions",
-        "maxInputTokens": 128000,
+        "maxInputTokens": 1050000,
         "maxOutputTokens": 16000
       },
       {
@@ -396,7 +399,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "thinking": true,
         "supportsReasoningEffort": ["none", "low", "medium", "high", "xhigh", "max"],
         "reasoningEffortFormat": "chat-completions",
-        "maxInputTokens": 128000,
+        "maxInputTokens": 1050000,
         "maxOutputTokens": 16000
       }
     ]
