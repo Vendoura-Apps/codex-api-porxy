@@ -81,10 +81,11 @@ uses the Codex CLI configuration. `ultra` is not a reasoning-effort value.
 Enable the optional Ponytail-inspired coding profile per request with
 `"ponytail":"lite"`, `"full"`, or `"ultra"`; use `"off"` to disable it.
 Clients that cannot add custom body fields can select
-`codex@ponytail-lite`, `codex@ponytail-full`, or `codex@ponytail-ultra` as the
-model ID. The proxy strips the suffix before selecting the underlying Codex
-model. See [Optional Ponytail mode](docs/ponytail.md) for client examples and
-precedence rules.
+`codex@ponytail-off`, `codex@ponytail-lite`, `codex@ponytail-full`, or
+`codex@ponytail-ultra` as the model ID. The proxy strips the suffix before
+selecting the underlying Codex model. See
+[Optional Ponytail mode](docs/ponytail.md) for client examples and precedence
+rules.
 
 ## Conversation sessions
 

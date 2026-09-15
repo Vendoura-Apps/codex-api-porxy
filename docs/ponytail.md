@@ -51,6 +51,7 @@ Klien yang tidak dapat menambah field request dapat memakai suffix model:
 - `codex@ponytail-lite`
 - `codex@ponytail-full`
 - `codex@ponytail-ultra`
+- `codex@ponytail-off` untuk memaksa profil tetap mati walaupun default server aktif
 
 Suffix yang sama dapat dipakai pada model eksplisit, misalnya
 `gpt-5.6-terra@ponytail-full`. Proxy melepas suffix sebelum memanggil Codex,
@@ -84,7 +85,7 @@ models:
 ```
 
 Untuk membuat pilihan aktif/mati di daftar model, buat dua entri Continue:
-satu memakai `model: codex`, satu lagi memakai
+satu memakai `model: codex@ponytail-off`, satu lagi memakai
 `model: codex@ponytail-full`.
 
 ## Custom Endpoint VS Code
@@ -95,8 +96,8 @@ Tambahkan model normal dan model Ponytail ke array `models`:
 {
   "models": [
     {
-      "id": "codex",
-      "name": "Codex Default",
+      "id": "codex@ponytail-off",
+      "name": "Codex (Ponytail Off)",
       "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
       "toolCalling": true,
       "vision": true
@@ -112,7 +113,7 @@ Tambahkan model normal dan model Ponytail ke array `models`:
 }
 ```
 
-Pilih **Codex Default** untuk mematikan Ponytail atau **Codex + Ponytail
+Pilih **Codex (Ponytail Off)** untuk mematikan Ponytail atau **Codex + Ponytail
 Full** untuk mengaktifkannya.
 
 ## Default pada server

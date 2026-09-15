@@ -13,6 +13,7 @@ test("validates bearer API keys", () => {
 test("advertises explicit Codex model choices", () => {
   assert.deepEqual(AVAILABLE_MODEL_IDS, [
     "codex",
+    "codex@ponytail-off",
     "codex@ponytail-lite",
     "codex@ponytail-full",
     "codex@ponytail-ultra",

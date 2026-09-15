@@ -150,8 +150,8 @@ Jalankan **Chat: Manage Language Models**, pilih **Add Models**, lalu pilih
     "apiType": "chat-completions",
     "models": [
       {
-        "id": "codex",
-        "name": "Codex Tailscale",
+        "id": "codex@ponytail-off",
+        "name": "Codex Tailscale (Ponytail Off)",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": true,
         "vision": true,
@@ -186,7 +186,7 @@ Custom Endpoint dapat berbeda menurut versi VS Code. Jika Chat bekerja tetapi
 Agent mode tidak mengirim tool, gunakan Continue dengan konfigurasi pada bagian
 sebelumnya.
 
-Di pemilih model, **Codex Tailscale** menggunakan mode default server,
+Di pemilih model, **Codex Tailscale (Ponytail Off)** mematikan Ponytail,
 sedangkan **Codex + Ponytail Full** selalu mengaktifkan Ponytail `full`.
 
 ## 6. Cara menggunakan Agent mode dengan aman
@@ -210,6 +210,7 @@ Model yang diiklankan endpoint:
 | Model | Penggunaan singkat |
 | --- | --- |
 | `codex` | Mengikuti model default akun Codex server; pilihan awal terbaik |
+| `codex@ponytail-off` | Model default dengan Ponytail dipaksa nonaktif |
 | `codex@ponytail-lite` | Model default dengan profil Ponytail ringan |
 | `codex@ponytail-full` | Model default dengan profil Ponytail penuh |
 | `codex@ponytail-ultra` | Model default dengan pembatasan scope paling ketat |

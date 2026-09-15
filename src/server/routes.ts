@@ -35,6 +35,7 @@ interface SessionContext {
 /** Model IDs available through the authenticated Codex CLI on this server. */
 export const AVAILABLE_MODEL_IDS = [
   "codex",
+  "codex@ponytail-off",
   "codex@ponytail-lite",
   "codex@ponytail-full",
   "codex@ponytail-ultra",

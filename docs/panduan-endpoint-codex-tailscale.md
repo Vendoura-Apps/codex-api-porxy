@@ -186,6 +186,7 @@ dan tahap rollout akun yang digunakan komputer server.
 | Nilai `model` | Kegunaan | Catatan |
 | --- | --- | --- |
 | `codex` | Pilihan utama untuk penggunaan umum | Mengikuti model default pada konfigurasi Codex CLI server |
+| `codex@ponytail-off` | Model default dengan Ponytail dipaksa nonaktif | Tetap `off` walaupun default server diubah |
 | `codex@ponytail-lite` | Model default dengan profil Ponytail ringan | Memudahkan pemilihan mode dari UI klien |
 | `codex@ponytail-full` | Model default dengan profil Ponytail penuh | Mode Ponytail yang disarankan untuk coding |
 | `codex@ponytail-ultra` | Model default dengan pembatasan scope paling ketat | Cocok saat ingin menekan kompleksitas secara agresif |
