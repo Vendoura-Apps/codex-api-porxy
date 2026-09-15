@@ -3,10 +3,42 @@
  * Used by OpenAI-compatible clients
  */
 
-export interface OpenAIContentBlock {
+export interface OpenAITextContentBlock {
   type: "text" | "input_text";
   text: string;
 }
+
+export type OpenAIImageDetail = "auto" | "low" | "high" | "original";
+
+export interface OpenAIImageUrlValue {
+  url: string;
+  detail?: OpenAIImageDetail;
+}
+
+export interface OpenAIImageUrlContentBlock {
+  type: "image_url";
+  image_url: string | OpenAIImageUrlValue;
+}
+
+export interface OpenAIInputImageContentBlock {
+  type: "input_image";
+  image_url?: string | OpenAIImageUrlValue;
+  url?: string;
+  detail?: OpenAIImageDetail;
+}
+
+export interface OpenAIInputFileContentBlock {
+  type: "input_file";
+  filename?: string;
+  file_data?: string;
+  file_id?: string;
+}
+
+export type OpenAIContentBlock =
+  | OpenAITextContentBlock
+  | OpenAIImageUrlContentBlock
+  | OpenAIInputImageContentBlock
+  | OpenAIInputFileContentBlock;
 
 export interface OpenAIChatMessage {
   role: "system" | "user" | "assistant" | "tool";

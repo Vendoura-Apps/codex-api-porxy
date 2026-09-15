@@ -5,7 +5,11 @@ import { mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { messagesToPrompt, normalizeReasoningEffort } from "../adapter/openai-to-codex.js";
+import {
+  extractText,
+  prepareCodexInput,
+  type PreparedCodexInput,
+} from "../adapter/openai-to-codex.js";
 import type {
   OpenAIChatMessage,
   OpenAIChatRequest,
@@ -47,6 +51,12 @@ export interface AgentBridgeOutput {
   text: string;
   toolCalls: OpenAIToolCall[];
   finishReason: "stop" | "tool_calls";
+}
+
+export interface AgentBridgeEvents {
+  onTextDelta?: (delta: string) => void;
+  signal?: AbortSignal;
+  preparedInput?: PreparedCodexInput;
 }
 
 interface ToolOutput {
@@ -100,9 +110,7 @@ function validateToolName(name: string | undefined): string {
 }
 
 function toolMessageContent(message: OpenAIChatMessage): string {
-  if (typeof message.content === "string") return message.content;
-  if (Array.isArray(message.content)) return message.content.map((part) => part.text).join("\n");
-  return "";
+  return extractText(message.content);
 }
 
 function configuredCodexBin(): string {
@@ -144,10 +152,15 @@ class CodexAgentTurn {
   private toolBatchTimer: NodeJS.Timeout | null = null;
   private stderr = "";
   private disposed = false;
+  private abortHandler: (() => void) | undefined;
+  private preparedInput: PreparedCodexInput | undefined;
+
+  constructor(private streamEvents?: AgentBridgeEvents) {}
 
   async start(request: OpenAIChatRequest): Promise<AgentBridgeOutput> {
     activeTurns.add(this);
     try {
+      this.preparedInput = this.streamEvents?.preparedInput || await prepareCodexInput(request);
       this.spawn();
 
       await this.rpc("initialize", {
@@ -175,10 +188,24 @@ class CodexAgentTurn {
         sandbox: "read-only",
         ephemeral: true,
         dynamicTools,
+        baseInstructions: [
+          "You are the VTI remote coding agent.",
+          "The app-server working directory is an isolated proxy implementation detail, not the user's workspace.",
+          "Use only the client-provided dynamic tools for every workspace operation.",
+        ].join(" "),
+        config: {
+          features: {
+            shell_tool: false,
+            unified_exec: false,
+            code_mode: false,
+          },
+        },
         developerInstructions: [
           "You are controlling a coding workspace on a remote client device.",
           "Use only the client-provided dynamic tools for files, search, edits, and terminal commands.",
           "Do not use built-in shell, filesystem, or patch tools because they run on the proxy server.",
+          "The path /tmp/codex-api-proxy-agent-bridge is never the client workspace; do not inspect, report, or mention it as one.",
+          "When asked about the active workspace, call the client workspace-info tool before answering.",
           "Inspect the client workspace with tools before making claims about its code.",
           choiceInstruction,
         ].filter(Boolean).join(" "),
@@ -191,8 +218,8 @@ class CodexAgentTurn {
       try {
         await this.rpc("turn/start", {
           threadId: this.threadId,
-          input: [{ type: "text", text: messagesToPrompt(request.messages), text_elements: [] }],
-          effort: normalizeReasoningEffort(request.reasoning_effort),
+          input: this.preparedInput.appServerInput,
+          effort: this.preparedInput.reasoningEffort,
         });
       } catch (error) {
         output.catch(() => undefined);
@@ -205,7 +232,7 @@ class CodexAgentTurn {
     }
   }
 
-  async continueWithToolOutputs(outputs: ToolOutput[]): Promise<AgentBridgeOutput> {
+  async continueWithToolOutputs(outputs: ToolOutput[], streamEvents?: AgentBridgeEvents): Promise<AgentBridgeOutput> {
     if (this.disposed) throw new AgentBridgeError("Agent turn is no longer active", 400, "expired_tool_call");
     if (outputs.length !== this.serverRequestIds.size ||
         outputs.some((output) => !this.serverRequestIds.has(output.callId))) {
@@ -215,6 +242,7 @@ class CodexAgentTurn {
         "incomplete_tool_outputs"
       );
     }
+    this.streamEvents = streamEvents;
     const output = this.waitForOutput();
     try {
       for (const item of outputs) {
@@ -241,11 +269,16 @@ class CodexAgentTurn {
   }
 
   shutdown(): void {
-    this.dispose();
+    this.rejectOutput(new AgentBridgeError("Agent bridge is shutting down", 503, "agent_bridge_shutdown"));
   }
 
   private spawn(): void {
-    this.child = spawn(configuredCodexBin(), ["app-server"], {
+    this.child = spawn(configuredCodexBin(), [
+      "app-server",
+      "--disable", "shell_tool",
+      "--disable", "unified_exec",
+      "--disable", "code_mode",
+    ], {
       cwd: safeBridgeCwd(),
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -256,11 +289,17 @@ class CodexAgentTurn {
     lines.on("line", (line) => this.handleLine(line));
     this.child.stderr.on("data", (chunk: Buffer) => {
       this.stderr = (this.stderr + chunk.toString()).slice(-8000);
-      if (process.env.DEBUG_SUBPROCESS) console.error("[Codex app-server stderr]", chunk.toString().trim());
+      if (process.env.DEBUG_SUBPROCESS) {
+        console.error(this.hasAttachments()
+          ? "[Codex app-server stderr redacted for attachment request]"
+          : `[Codex app-server stderr] ${chunk.toString().trim()}`);
+      }
     });
     this.child.once("error", (error) => this.fail(error));
     this.child.once("close", (code) => {
-      if (!this.disposed) this.fail(new Error(this.stderr.trim() || `Codex app-server exited with code ${code}`));
+      if (!this.disposed) this.fail(new Error(this.safeErrorMessage(
+        this.stderr.trim() || `Codex app-server exited with code ${code}`
+      )));
     });
   }
 
@@ -303,7 +342,9 @@ class CodexAgentTurn {
       if (!waiter) return;
       clearTimeout(waiter.timeout);
       this.rpcWaiters.delete(message.id);
-      if (message.error) waiter.reject(new AgentBridgeError(message.error.message || "Codex app-server request failed"));
+      if (message.error) waiter.reject(new AgentBridgeError(this.safeErrorMessage(
+        message.error.message || "Codex app-server request failed"
+      )));
       else waiter.resolve(message.result);
       return;
     }
@@ -350,19 +391,24 @@ class CodexAgentTurn {
 
     if (message.method === "item/agentMessage/delta" && typeof params.delta === "string") {
       this.text += params.delta;
+      this.streamEvents?.onTextDelta?.(params.delta);
       return;
     }
 
     if (message.method === "error") {
       const error = params.error as { message?: string } | undefined;
-      if (params.willRetry !== true) this.rejectOutput(new AgentBridgeError(error?.message || "Codex agent turn failed"));
+      if (params.willRetry !== true) this.rejectOutput(new AgentBridgeError(this.safeErrorMessage(
+        error?.message || "Codex agent turn failed"
+      )));
       return;
     }
 
     if (message.method === "turn/completed") {
       const turn = params.turn as { status?: string; error?: { message?: string } | null } | undefined;
       if (turn?.status === "failed") {
-        this.rejectOutput(new AgentBridgeError(turn.error?.message || "Codex agent turn failed"));
+        this.rejectOutput(new AgentBridgeError(this.safeErrorMessage(
+          turn.error?.message || "Codex agent turn failed"
+        )));
       } else {
         this.resolveOutput("stop");
       }
@@ -378,7 +424,26 @@ class CodexAgentTurn {
         this.rejectOutput(new AgentBridgeError("Agent turn timed out"));
       }, TURN_TIMEOUT);
       this.outputWaiter = { resolve, reject, timeout };
+      const signal = this.streamEvents?.signal;
+      this.abortHandler = () => this.rejectOutput(
+        new AgentBridgeError("Client disconnected before the agent turn completed", 499, "client_disconnected")
+      );
+      if (signal?.aborted) this.abortHandler();
+      else signal?.addEventListener("abort", this.abortHandler, { once: true });
     });
+  }
+
+  private clearAbortHandler(): void {
+    if (this.abortHandler) this.streamEvents?.signal?.removeEventListener("abort", this.abortHandler);
+    this.abortHandler = undefined;
+  }
+
+  private hasAttachments(): boolean {
+    return this.preparedInput?.attachmentStore.directory !== undefined;
+  }
+
+  private safeErrorMessage(message: string): string {
+    return this.hasAttachments() ? "Codex failed while processing an attachment" : message;
   }
 
   private resolveOutput(reason: "stop" | "tool_calls"): void {
@@ -388,6 +453,8 @@ class CodexAgentTurn {
     this.toolBatchTimer = null;
     clearTimeout(waiter.timeout);
     this.outputWaiter = null;
+    this.clearAbortHandler();
+    this.streamEvents = undefined;
     waiter.resolve({ text: this.text, toolCalls: [...this.toolCalls], finishReason: reason });
     if (reason === "stop") this.dispose();
   }
@@ -397,6 +464,7 @@ class CodexAgentTurn {
     if (waiter) {
       clearTimeout(waiter.timeout);
       this.outputWaiter = null;
+      this.clearAbortHandler();
       waiter.reject(error);
     }
     this.dispose();
@@ -418,6 +486,8 @@ class CodexAgentTurn {
     for (const callId of this.serverRequestIds.keys()) pendingToolCalls.delete(callId);
     this.serverRequestIds.clear();
     activeTurns.delete(this);
+    this.preparedInput?.attachmentStore.cleanup();
+    this.preparedInput = undefined;
     this.child?.kill();
     this.child = null;
   }
@@ -430,16 +500,17 @@ export function isAgentBridgeRequest(request: OpenAIChatRequest): boolean {
   );
 }
 
-export async function runAgentBridge(request: OpenAIChatRequest): Promise<AgentBridgeOutput> {
+export async function runAgentBridge(request: OpenAIChatRequest, streamEvents?: AgentBridgeEvents): Promise<AgentBridgeOutput> {
   const toolMessages = request.messages.filter((message) => message.role === "tool");
   if (toolMessages.length === 0) {
     if (!request.tools?.length) {
       throw new AgentBridgeError("Agent requests must include at least one function tool", 400, "missing_tools");
     }
     if (activeTurns.size >= maxActiveTurns()) {
+      streamEvents?.preparedInput?.attachmentStore.cleanup();
       throw new AgentBridgeError("Too many active agent turns; try again later", 429, "agent_bridge_busy");
     }
-    return new CodexAgentTurn().start(request);
+    return new CodexAgentTurn(streamEvents).start(request);
   }
 
   const pendingMessages = toolMessages.filter((message) =>
@@ -458,7 +529,7 @@ export async function runAgentBridge(request: OpenAIChatRequest): Promise<AgentB
   if (!turn || outputs.some((output) => !turn.ownsCall(output.callId))) {
     throw new AgentBridgeError("Unknown, expired, or mixed tool_call_id values", 400, "invalid_tool_call_id");
   }
-  return turn.continueWithToolOutputs(outputs);
+  return turn.continueWithToolOutputs(outputs, streamEvents);
 }
 
 export function shutdownAgentBridges(): void {

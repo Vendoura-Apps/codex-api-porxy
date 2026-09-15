@@ -12,7 +12,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/server/standalone.js",
-    "test": "node --test dist/adapter/*.test.js dist/server/*.test.js dist/subprocess/*.test.js",
+    "test": "node --test dist/adapter/*.test.js dist/attachments/*.test.js dist/server/*.test.js dist/subprocess/*.test.js",
     "test:e2e": "RUN_CODEX_E2E=1 node --test dist/e2e.test.js",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build"

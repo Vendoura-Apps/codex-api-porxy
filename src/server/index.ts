@@ -8,6 +8,7 @@ import express, { Express, Request, Response, NextFunction } from "express";
 import { createServer, Server } from "http";
 import { timingSafeEqual } from "crypto";
 import { handleChatCompletions, handleModels, handleHealth } from "./routes.js";
+import { requestBodyMaxBytes } from "../attachments/attachment-store.js";
 
 export interface ServerConfig {
   port: number;
@@ -30,28 +31,26 @@ export function createApp(): Express {
   const app = express();
 
   // Middleware: use raw body parser + manual JSON parse for better error diagnostics
-  app.use(express.raw({ type: "application/json", limit: "10mb" }));
+  app.use(express.raw({ type: "application/json", limit: requestBodyMaxBytes() }));
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (req.body && Buffer.isBuffer(req.body) && req.body.length > 0) {
       const raw = req.body.toString("utf8");
-      if (process.env.DEBUG) {
-        console.log("[Body raw]:", raw.substring(0, 200));
-      }
       try {
         req.body = JSON.parse(raw);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[Body parse error]:", msg);
-        if (process.env.DEBUG) {
-          console.error("[Body raw]:", raw.substring(0, 300));
-        } else {
-          console.error("[Body metadata]:", {
-            length: raw.length,
-            method: req.method,
-            url: req.originalUrl,
-          });
-        }
-        return next(err);
+      } catch {
+        console.error("[Body parse error]: invalid JSON");
+        console.error("[Body metadata]:", {
+          length: raw.length,
+          method: req.method,
+          url: req.originalUrl,
+        });
+        const parseError = new Error("Request body contains invalid JSON") as Error & {
+          status?: number;
+          code?: string;
+        };
+        parseError.status = 400;
+        parseError.code = "invalid_json";
+        return next(parseError);
       }
     }
     next();
@@ -111,13 +110,16 @@ export function createApp(): Express {
   });
 
   // Error handler
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error("[Server Error]:", err.message);
-    res.status(500).json({
+  app.use((err: Error & { status?: number; type?: string; code?: string }, _req: Request, res: Response, _next: NextFunction) => {
+    const bodyTooLarge = err.type === "entity.too.large" || err.status === 413;
+    const status = bodyTooLarge ? 413 : err.status === 400 ? 400 : 500;
+    const code = bodyTooLarge ? "request_body_too_large" : err.code || null;
+    console.error("[Server Error]:", bodyTooLarge ? "Request body exceeds configured limit" : err.message);
+    res.status(status).json({
       error: {
-        message: err.message,
-        type: "server_error",
-        code: null,
+        message: bodyTooLarge ? "Request body exceeds the configured size limit" : err.message,
+        type: status < 500 ? "invalid_request_error" : "server_error",
+        code,
       },
     });
   });

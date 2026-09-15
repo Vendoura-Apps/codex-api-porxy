@@ -9,7 +9,7 @@ menjalankan terminal tetap berjalan pada perangkat klien.
 Untuk petunjuk langkah demi langkah yang dapat langsung diberikan kepada rekan,
 baca [Panduan Client Codex Agent](panduan-client-agent.md).
 
-Terakhir diperbarui: 14 September 2026.
+Terakhir diperbarui: 15 September 2026.
 
 ## Ringkasan koneksi
 
@@ -327,7 +327,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "name": "Codex CLI Default",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "streaming": true,
         "thinking": true,
         "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
@@ -340,7 +340,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "name": "Codex 5.6 Terra",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "streaming": true,
         "thinking": true,
         "supportsReasoningEffort": ["none", "low", "medium", "high", "xhigh", "max"],
@@ -353,7 +353,7 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
         "name": "Codex 5.6 Luna",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "streaming": true,
         "thinking": true,
         "supportsReasoningEffort": ["none", "low", "medium", "high", "xhigh", "max"],
@@ -502,9 +502,11 @@ Field permintaan yang digunakan:
 | `frequency_penalty` | Diabaikan | Tidak diteruskan ke Codex CLI |
 | `presence_penalty` | Diabaikan | Tidak diteruskan ke Codex CLI |
 
-Content yang didukung adalah teks biasa serta blok `text` atau `input_text`.
-Function tool calls dan pesan hasil tool didukung. Gambar, audio, embeddings,
-Responses API, dan structured outputs belum didukung oleh proxy ini.
+Content yang didukung adalah teks biasa, `text`, `input_text`, gambar base64
+PNG/JPEG/WebP melalui `image_url` atau `input_image`, serta file teks UTF-8
+melalui `input_file`. Function tool calls dan pesan hasil tool juga didukung.
+PDF, audio, embeddings, Responses API, structured outputs, URL attachment
+remote, dan `file_id` belum didukung. Lihat [kontrak attachment](attachments.md).
 
 ## Ruang kerja dan izin
 
@@ -650,8 +652,8 @@ beberapa tool sekaligus, klien harus mengirim semua hasilnya dalam satu request.
 
 Proxy tidak memasang tool langsung pada perangkat klien. Pengalaman agent
 bergantung pada Continue, VS Code, atau klien lain yang benar-benar menyediakan
-function tools dan alur persetujuan. Input gambar dan kompatibilitas penuh
-dengan seluruh ekstensi belum tersedia.
+function tools dan alur persetujuan. Dukungan UI untuk memilih serta mengirim
+attachment tetap bergantung pada versi klien yang digunakan.
 
 ## Referensi
 

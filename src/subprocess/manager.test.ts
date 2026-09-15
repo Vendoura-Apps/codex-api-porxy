@@ -33,6 +33,30 @@ describe("CodexSubprocess", () => {
     ]);
   });
 
+  it("passes image paths as argv entries for initial and resumed turns", () => {
+    const subprocess = new CodexSubprocess() as unknown as {
+      buildArgs: (options: object) => string[];
+    };
+    const initial = subprocess.buildArgs({
+      imagePaths: ["/tmp/one.png", "/tmp/two.webp"],
+      sandbox: "read-only",
+    });
+    assert.deepEqual(initial.slice(0, 6), [
+      "exec", "--json", "--image", "/tmp/one.png", "--image", "/tmp/two.webp",
+    ]);
+
+    const resumed = subprocess.buildArgs({
+      threadId: "thread-123",
+      resume: true,
+      imagePaths: ["/tmp/one.png"],
+      sandbox: "read-only",
+    });
+    assert.deepEqual(resumed, [
+      "exec", "--sandbox", "read-only", "resume", "--json",
+      "--image", "/tmp/one.png", "thread-123", "-",
+    ]);
+  });
+
   it("parses thread, agent message, and usage events", async () => {
     const subprocess = new CodexSubprocess();
     const testable = subprocess as unknown as {

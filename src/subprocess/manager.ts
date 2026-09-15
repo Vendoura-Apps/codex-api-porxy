@@ -23,6 +23,8 @@ export interface SubprocessOptions {
   cwd?: string;
   timeout?: number;
   sandbox?: CodexSandbox;
+  imagePaths?: string[];
+  redactAttachmentData?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 15 * 60 * 1000;
@@ -103,13 +105,20 @@ export class CodexSubprocess extends EventEmitter {
         });
         this.process.stderr?.on("data", (chunk: Buffer) => {
           this.stderr = (this.stderr + chunk.toString()).slice(-8000);
-          if (process.env.DEBUG_SUBPROCESS) console.error("[Codex stderr]", chunk.toString().trim());
+          if (process.env.DEBUG_SUBPROCESS) {
+            console.error(options.redactAttachmentData
+              ? "[Codex stderr redacted for attachment request]"
+              : `[Codex stderr] ${chunk.toString().trim()}`);
+          }
         });
         this.process.on("close", (code) => {
           this.clearTimeout();
           this.processBuffer(true);
           if (code !== 0 && !this.completed && !this.isKilled) {
-            this.emitError(new Error(this.stderr.trim() || `Codex CLI exited with code ${code}`));
+            const detail = options.redactAttachmentData
+              ? "Codex CLI failed while processing an attachment"
+              : this.stderr.trim() || `Codex CLI exited with code ${code}`;
+            this.emitError(new Error(detail));
           }
           this.emit("close", code);
         });
@@ -127,10 +136,11 @@ export class CodexSubprocess extends EventEmitter {
     if (options.reasoningEffort) {
       common.push("--config", `model_reasoning_effort="${options.reasoningEffort}"`);
     }
+    const images = (options.imagePaths || []).flatMap((imagePath) => ["--image", imagePath]);
     if (options.resume && options.threadId) {
-      return ["exec", "--sandbox", sandbox, "resume", ...common, options.threadId, "-"];
+      return ["exec", "--sandbox", sandbox, "resume", ...common, ...images, options.threadId, "-"];
     }
-    return ["exec", ...common, "--color", "never", "--sandbox", sandbox, "-"];
+    return ["exec", ...common, ...images, "--color", "never", "--sandbox", sandbox, "-"];
   }
 
   private processBuffer(flush: boolean): void {

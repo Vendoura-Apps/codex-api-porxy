@@ -3,6 +3,7 @@
 import { startServer, stopServer } from "./index.js";
 import { verifyAuth, verifyCodex } from "../subprocess/manager.js";
 import { shutdownAgentBridges } from "../subprocess/agent-bridge.js";
+import { shutdownAttachmentStores } from "../attachments/attachment-store.js";
 
 const DEFAULT_PORT = 3456;
 
@@ -30,6 +31,7 @@ async function main(): Promise<void> {
 
   const shutdown = async () => {
     shutdownAgentBridges();
+    shutdownAttachmentStores();
     await stopServer();
     process.exit(0);
   };

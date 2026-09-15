@@ -51,6 +51,23 @@ curl http://127.0.0.1:3456/v1/chat/completions \
 
 For SSE, add `"stream":true` to the JSON body and use `curl -N`.
 
+Images and UTF-8 text files can be sent as base64 data URLs in content blocks:
+
+```bash
+curl http://127.0.0.1:3456/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model":"codex",
+    "messages":[{"role":"user","content":[
+      {"type":"text","text":"Describe this image"},
+      {"type":"image_url","image_url":{"url":"data:image/png;base64,<BASE64_PNG>"}}
+    ]}]
+  }'
+```
+
+See [Attachment contract for VTI clients](docs/attachments.md) for file blocks,
+supported MIME types, limits, lifecycle, and structured errors.
+
 The `codex` model alias uses the model selected by Codex CLI configuration.
 You may also pass an explicit model ID; the proxy forwards it through
 `codex exec --model`. `GET /v1/models` advertises the explicit model choices
@@ -77,6 +94,10 @@ six hours and reset when the server restarts.
 | `CODEX_SANDBOX` | `read-only` | `read-only`, `workspace-write`, or `danger-full-access` |
 | `CODEX_AGENT_BRIDGE_CWD` | isolated directory under the OS temp folder | Safe server-side directory used by agent bridge sessions |
 | `CODEX_AGENT_BRIDGE_MAX_ACTIVE` | `16` | Maximum number of agent turns waiting for client tool results |
+| `CODEX_ATTACHMENT_MAX_COUNT` | `10` | Maximum attachments per request |
+| `CODEX_ATTACHMENT_MAX_BYTES` | `10485760` | Maximum decoded bytes per attachment |
+| `CODEX_ATTACHMENT_MAX_TOTAL_BYTES` | `26214400` | Maximum decoded attachment bytes per request |
+| `CODEX_HTTP_BODY_MAX_BYTES` | `41943040` | Maximum encoded JSON request body |
 | `CODEX_PROXY_API_KEY` | unset | Require this value as a Bearer token on all `/v1` routes |
 | `DEBUG` | unset | Log HTTP request metadata |
 | `DEBUG_SUBPROCESS` | unset | Log Codex stderr |
@@ -127,7 +148,10 @@ npm run test:e2e
 
 ## Compatibility notes
 
-- Text messages and text content blocks are supported.
+- Text messages, base64 PNG/JPEG/WebP images, and allowlisted UTF-8 text files
+  are supported. Remote attachment URLs and `file_id` are rejected.
+- Images use native Codex image input. Text files are decoded into bounded,
+  clearly labeled prompt sections. PDF is not currently supported.
 - SSE text is delivered when a Codex agent-message item completes, rather than
   token by token.
 - OpenAI function `tools`, assistant `tool_calls`, and `tool` result messages are

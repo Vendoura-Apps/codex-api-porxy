@@ -6,9 +6,10 @@ import { CodexSubprocess } from "../subprocess/manager.js";
 import {
   normalizeReasoningEffort,
   openaiToCodex,
-  openaiToCodexDelta,
-  type CodexInput,
+  prepareCodexInput,
+  type PreparedCodexInput,
 } from "../adapter/openai-to-codex.js";
+import { AttachmentError } from "../attachments/attachment-store.js";
 import { createDoneChunk, createTextChunk, codexResultToOpenai } from "../adapter/codex-to-openai.js";
 import { clearSession, getSession, setSession } from "../subprocess/session-store.js";
 import {
@@ -39,12 +40,13 @@ export const AVAILABLE_MODEL_IDS = [
   "gpt-5.3-codex-spark",
 ] as const;
 
-function resolveCliInput(body: OpenAIChatRequest): { input: CodexInput; session: SessionContext } {
+async function resolveCliInput(body: OpenAIChatRequest): Promise<{ input: PreparedCodexInput; session: SessionContext }> {
   const sessionKey = body.user;
   const existing = sessionKey ? getSession(sessionKey) : undefined;
   if (existing) {
+    const appended = body.messages.slice(existing.messageCount).filter((message) => message.role !== "assistant");
     return {
-      input: openaiToCodexDelta(body, existing.messageCount),
+      input: await prepareCodexInput(body, appended.length ? appended : body.messages),
       session: {
         sessionKey,
         threadId: existing.threadId,
@@ -54,7 +56,7 @@ function resolveCliInput(body: OpenAIChatRequest): { input: CodexInput; session:
     };
   }
   return {
-    input: openaiToCodex(body),
+    input: await prepareCodexInput(body),
     session: { sessionKey, resume: false, messageCount: body.messages.length },
   };
 }
@@ -87,11 +89,13 @@ export async function handleChatCompletions(req: Request, res: Response): Promis
 
   try {
     if (isAgentBridgeRequest(body)) {
-      await handleAgentBridgeResponse(res, body, requestId);
+      const isContinuation = body.messages.some((message) => message.role === "tool");
+      const preparedInput = isContinuation ? undefined : await prepareCodexInput(body);
+      await handleAgentBridgeResponse(res, body, requestId, preparedInput);
       return;
     }
 
-    const { input, session } = resolveCliInput(body);
+    const { input, session } = await resolveCliInput(body);
     const subprocess = new CodexSubprocess();
     if (body.stream === true) {
       await handleStreamingResponse(res, subprocess, input, requestId, session);
@@ -101,8 +105,9 @@ export async function handleChatCompletions(req: Request, res: Response): Promis
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     if (!res.headersSent) {
-      const status = error instanceof AgentBridgeError ? error.status : 500;
-      const code = error instanceof AgentBridgeError ? error.code : null;
+      const structured = error instanceof AgentBridgeError || error instanceof AttachmentError;
+      const status = structured ? error.status : 500;
+      const code = structured ? error.code : null;
       res.status(status).json({ error: { message, type: status < 500 ? "invalid_request_error" : "server_error", code } });
     } else if (!res.writableEnded) {
       res.end();
@@ -113,15 +118,26 @@ export async function handleChatCompletions(req: Request, res: Response): Promis
 async function handleAgentBridgeResponse(
   res: Response,
   body: OpenAIChatRequest,
-  requestId: string
+  requestId: string,
+  preparedInput?: PreparedCodexInput
 ): Promise<void> {
-  const output = await runAgentBridge(body);
   const responseModel = openaiToCodex(body).responseModel;
+  const controller = new AbortController();
+  const abort = () => {
+    if (!res.writableEnded) controller.abort();
+  };
+  res.once("close", abort);
   if (body.stream === true) {
-    writeAgentBridgeStream(res, output, requestId, responseModel);
+    await writeAgentBridgeStream(res, body, requestId, responseModel, controller.signal, preparedInput);
+    res.removeListener("close", abort);
     return;
   }
-  res.json(agentBridgeResponse(output, requestId, responseModel));
+  try {
+    const output = await runAgentBridge(body, { signal: controller.signal, preparedInput });
+    res.json(agentBridgeResponse(output, requestId, responseModel));
+  } finally {
+    res.removeListener("close", abort);
+  }
 }
 
 function agentBridgeResponse(
@@ -147,51 +163,80 @@ function agentBridgeResponse(
   };
 }
 
-function writeAgentBridgeStream(
+async function writeAgentBridgeStream(
   res: Response,
-  output: AgentBridgeOutput,
+  body: OpenAIChatRequest,
   requestId: string,
-  model: string
-): void {
+  model: string,
+  signal: AbortSignal,
+  preparedInput?: PreparedCodexInput
+): Promise<void> {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Request-Id", requestId);
   res.flushHeaders();
+  res.write(":ok\n\n");
 
   const created = Math.floor(Date.now() / 1000);
-  const first: OpenAIChatChunk = {
-    id: `chatcmpl-${requestId}`,
-    object: "chat.completion.chunk",
-    created,
-    model,
-    choices: [{
-      index: 0,
-      delta: {
-        role: "assistant",
-        content: output.text || undefined,
-        tool_calls: output.toolCalls.map((call, index) => ({
-          index,
-          id: call.id,
-          type: "function",
-          function: call.function,
-        })),
-      },
-      finish_reason: null,
-    }],
+  let first = true;
+  let streamedText = "";
+  const writeText = (delta: string) => {
+    if (!delta || res.writableEnded || res.destroyed) return;
+    streamedText += delta;
+    res.write(`data: ${JSON.stringify(createTextChunk(requestId, model, delta, first))}\n\n`);
+    first = false;
   };
-  const done: OpenAIChatChunk = {
-    id: `chatcmpl-${requestId}`,
-    object: "chat.completion.chunk",
-    created,
-    model,
-    choices: [{ index: 0, delta: {}, finish_reason: output.finishReason }],
-    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-  };
-  res.write(`data: ${JSON.stringify(first)}\n\n`);
-  res.write(`data: ${JSON.stringify(done)}\n\n`);
-  res.write("data: [DONE]\n\n");
-  res.end();
+
+  try {
+    const output = await runAgentBridge(body, { onTextDelta: writeText, signal, preparedInput });
+    if (output.text.startsWith(streamedText)) writeText(output.text.slice(streamedText.length));
+    else if (!streamedText) writeText(output.text);
+
+    if (output.toolCalls.length && !res.writableEnded && !res.destroyed) {
+      const tools: OpenAIChatChunk = {
+        id: `chatcmpl-${requestId}`,
+        object: "chat.completion.chunk",
+        created,
+        model,
+        choices: [{
+          index: 0,
+          delta: {
+            ...(first ? { role: "assistant" as const } : {}),
+            tool_calls: output.toolCalls.map((call, index) => ({
+              index,
+              id: call.id,
+              type: "function" as const,
+              function: call.function,
+            })),
+          },
+          finish_reason: null,
+        }],
+      };
+      res.write(`data: ${JSON.stringify(tools)}\n\n`);
+      first = false;
+    }
+
+    if (!res.writableEnded && !res.destroyed) {
+      const done: OpenAIChatChunk = {
+        id: `chatcmpl-${requestId}`,
+        object: "chat.completion.chunk",
+        created,
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: output.finishReason }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      };
+      res.write(`data: ${JSON.stringify(done)}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    }
+  } catch (error) {
+    if (!res.writableEnded && !res.destroyed) {
+      res.write(`data: ${JSON.stringify({ error: { message: error instanceof Error ? error.message : "Unknown error", type: "server_error", code: null } })}\n\n`);
+      res.write("data: [DONE]\n\n");
+      res.end();
+    }
+  }
 }
 
 function rememberSession(session: SessionContext, result: CodexResult): void {
@@ -207,7 +252,7 @@ function forgetFailedResume(session: SessionContext): void {
 async function handleStreamingResponse(
   res: Response,
   subprocess: CodexSubprocess,
-  input: CodexInput,
+  input: PreparedCodexInput,
   requestId: string,
   session: SessionContext
 ): Promise<void> {
@@ -225,12 +270,14 @@ async function handleStreamingResponse(
     const finish = () => {
       if (finished) return;
       finished = true;
+      input.attachmentStore.cleanup();
       if (!res.writableEnded) res.end();
       resolve();
     };
 
     res.on("close", () => {
       if (!finished) subprocess.kill();
+      input.attachmentStore.cleanup();
       finished = true;
       resolve();
     });
@@ -279,6 +326,8 @@ async function handleStreamingResponse(
       reasoningEffort: input.reasoningEffort,
       threadId: session.threadId,
       resume: session.resume,
+      imagePaths: input.imagePaths,
+      redactAttachmentData: input.attachmentStore.directory !== undefined,
     }).catch((error: Error) => {
       if (finished) return;
       forgetFailedResume(session);
@@ -293,7 +342,7 @@ async function handleStreamingResponse(
 async function handleNonStreamingResponse(
   res: Response,
   subprocess: CodexSubprocess,
-  input: CodexInput,
+  input: PreparedCodexInput,
   requestId: string,
   session: SessionContext
 ): Promise<void> {
@@ -303,6 +352,7 @@ async function handleNonStreamingResponse(
     const sendError = (message: string) => {
       if (finished) return;
       finished = true;
+      input.attachmentStore.cleanup();
       forgetFailedResume(session);
       res.status(500).json({ error: { message, type: "server_error", code: null } });
       resolve();
@@ -311,11 +361,19 @@ async function handleNonStreamingResponse(
     subprocess.on("result", (result: CodexResult) => {
       if (finished) return;
       finished = true;
+      input.attachmentStore.cleanup();
       rememberSession(session, result);
       res.json(codexResultToOpenai(result, requestId, input.responseModel));
       resolve();
     });
     subprocess.on("error", (error: Error) => sendError(error.message));
+    res.on("close", () => {
+      if (finished) return;
+      finished = true;
+      subprocess.kill();
+      input.attachmentStore.cleanup();
+      resolve();
+    });
     subprocess.on("close", (code: number | null) => {
       if (!finished) sendError(`Codex CLI exited with code ${code} without completing a turn`);
     });
@@ -324,6 +382,8 @@ async function handleNonStreamingResponse(
       reasoningEffort: input.reasoningEffort,
       threadId: session.threadId,
       resume: session.resume,
+      imagePaths: input.imagePaths,
+      redactAttachmentData: input.attachmentStore.directory !== undefined,
     }).catch((error: Error) => sendError(error.message));
   });
 }

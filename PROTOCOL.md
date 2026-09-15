@@ -55,3 +55,19 @@ This prevents agent bridge turns from operating on the proxy repository. A
 pending bridge turn expires after 15 minutes and is also discarded when the
 service restarts. If Codex requests several tools together, the client must
 return all of those tool outputs in the same follow-up HTTP request.
+
+## Attachments
+
+The proxy decodes validated base64 data URLs into a unique temporary directory.
+For `codex exec`, image paths are passed as repeated `--image` arguments. For
+App Server, the generated protocol's native `localImage` input is used:
+
+```json
+{ "type": "localImage", "path": "/tmp/.../image-1.png", "detail": "auto" }
+```
+
+Allowlisted UTF-8 files have no native App Server general-file input, so their
+decoded text is inserted at the corresponding content-block position in the
+prompt. PDF is rejected. The attachment store belongs to the request or active
+agent turn and is cleaned on every terminal lifecycle path. See
+[`docs/attachments.md`](docs/attachments.md) for the client contract.

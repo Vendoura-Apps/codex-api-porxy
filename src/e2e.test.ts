@@ -14,6 +14,10 @@ import { startServer, stopServer } from "./server/index.js";
 import { shutdownAgentBridges } from "./subprocess/agent-bridge.js";
 import type { Server } from "http";
 import type { AddressInfo } from "net";
+import { deflateSync } from "node:zlib";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 const RUN_LIVE = process.env.RUN_CODEX_E2E === "1";
 
@@ -22,6 +26,42 @@ let server: Server;
 
 // Longer timeout — Codex CLI can take a while
 const TEST_TIMEOUT = 120_000;
+
+function crc32(buffer: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const name = Buffer.from(type, "ascii");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(crc32(Buffer.concat([name, data])));
+  return Buffer.concat([length, name, data, checksum]);
+}
+
+function redPngDataUrl(): string {
+  const width = 8;
+  const height = 8;
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 2;
+  const row = Buffer.from([0, ...Array.from({ length: width }, () => [255, 0, 0]).flat()]);
+  const png = Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(Buffer.concat(Array.from({ length: height }, () => row)))),
+    pngChunk("IEND", Buffer.alloc(0)),
+  ]);
+  return `data:image/png;base64,${png.toString("base64")}`;
+}
 
 before(async () => {
   server = await startServer({ port: 0 });
@@ -80,6 +120,24 @@ describe("health and models", () => {
     const body = await res.json() as any;
     assert.ok(body.error);
     assert.equal(body.error.code, "invalid_messages");
+  });
+
+  it("returns a structured error for remote attachment URLs", async () => {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "codex",
+        messages: [{
+          role: "user",
+          content: [{ type: "image_url", image_url: { url: "https://example.com/private.png" } }],
+        }],
+      }),
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as any;
+    assert.equal(body.error.code, "remote_attachment_url_disabled");
+    assert.doesNotMatch(body.error.message, /private\.png/);
   });
 });
 
@@ -203,6 +261,86 @@ describe("non-streaming completion", { timeout: TEST_TIMEOUT, skip: !RUN_LIVE },
     assert.equal(res.status, 200);
     const body = await res.json() as any;
     assert.ok(body.choices[0].message.content.length > 0);
+  });
+
+  it("passes a PNG to codex exec for a non-streaming completion", async () => {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-5.6-luna",
+        reasoning_effort: "low",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "Identify the dominant color in the attached image. Reply with only the color name." },
+            { type: "image_url", image_url: { url: redPngDataUrl(), detail: "auto" } },
+          ],
+        }],
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json() as any;
+    assert.match(body.choices[0].message.content, /red/i);
+  });
+
+  it("keeps an image through an agent tool continuation and cleans it afterward", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "agent-attachment-e2e-"));
+    const previousRoot = process.env.CODEX_ATTACHMENT_TMPDIR;
+    process.env.CODEX_ATTACHMENT_TMPDIR = root;
+    try {
+      const tools = [{
+        type: "function",
+        function: {
+          name: "client_echo",
+          description: "Return the supplied text. Always call it when the user asks.",
+          parameters: {
+            type: "object",
+            properties: { text: { type: "string" } },
+            required: ["text"],
+          },
+        },
+      }];
+      const user = {
+        role: "user",
+        content: [
+          { type: "text", text: "Inspect the image, call client_echo with READY, then report its dominant color and the tool result." },
+          { type: "image_url", image_url: { url: redPngDataUrl() } },
+        ],
+      };
+      const firstResponse = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-5.6-luna", reasoning_effort: "low", messages: [user], tools }),
+      });
+      assert.equal(firstResponse.status, 200);
+      const first = await firstResponse.json() as any;
+      assert.equal(first.choices[0].finish_reason, "tool_calls");
+      assert.ok((await readdir(root)).length > 0, "attachment should remain while the tool call is pending");
+      const call = first.choices[0].message.tool_calls[0];
+
+      const secondResponse = await fetch(`${baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-5.6-luna",
+          reasoning_effort: "low",
+          messages: [user, first.choices[0].message, {
+            role: "tool", tool_call_id: call.id, content: "READY-OK",
+          }],
+          tools,
+        }),
+      });
+      assert.equal(secondResponse.status, 200);
+      const second = await secondResponse.json() as any;
+      assert.match(second.choices[0].message.content, /red/i);
+      assert.match(second.choices[0].message.content, /READY-OK/i);
+      assert.deepEqual(await readdir(root), []);
+    } finally {
+      if (previousRoot === undefined) delete process.env.CODEX_ATTACHMENT_TMPDIR;
+      else process.env.CODEX_ATTACHMENT_TMPDIR = previousRoot;
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("resumes a Codex thread when request.user is stable", async () => {
@@ -348,5 +486,31 @@ describe("streaming completion", { timeout: TEST_TIMEOUT, skip: !RUN_LIVE }, () 
       .map((c) => c.choices[0].delta.content || "")
       .join("");
     assert.ok(fullText.length > 0, "streamed text should be non-empty");
+  });
+
+  it("streams a multimodal PNG response", async () => {
+    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-5.6-luna",
+        reasoning_effort: "low",
+        stream: true,
+        messages: [{
+          role: "user",
+          content: [
+            { type: "input_text", text: "Identify the dominant color in this image. Reply with only the color name." },
+            { type: "input_image", image_url: redPngDataUrl() },
+          ],
+        }],
+      }),
+    });
+    assert.equal(res.status, 200);
+    const chunks = (await res.text()).split("\n")
+      .filter((line) => line.startsWith("data: {") )
+      .map((line) => JSON.parse(line.slice(6)));
+    const text = chunks.map((chunk) => chunk.choices?.[0]?.delta?.content || "").join("");
+    assert.match(text, /red/i);
+    assert.equal(chunks.at(-1)?.choices?.[0]?.finish_reason, "stop");
   });
 });

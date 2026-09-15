@@ -150,7 +150,7 @@ Jalankan **Chat: Manage Language Models**, pilih **Add Models**, lalu pilih
         "name": "Codex Tailscale",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": true,
-        "vision": false,
+        "vision": true,
         "streaming": true,
         "thinking": true,
         "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
@@ -273,3 +273,34 @@ Login Codex tidak disalin ke klien. Walaupun demikian, prompt, potongan file,
 hasil pencarian, dan output terminal yang diperlukan agent melewati proxy dan
 diproses oleh layanan Codex. Semua pemakaian rekan menggunakan akun dan kuota
 Codex pada server.
+
+## Mengirim gambar dan file
+
+Klien dapat mengirim PNG, JPEG, WebP, serta file teks UTF-8 melalui content
+blocks. Aktifkan dukungan vision pada konfigurasi model dengan
+`"vision": true`. URL gambar dari internet tidak diterima; klien harus membaca
+file lokal dan mengirimkannya sebagai base64 data URL.
+
+Contoh bentuk pesannya:
+
+```json
+{
+  "role": "user",
+  "content": [
+    {"type": "text", "text": "Analisis gambar dan catatan berikut"},
+    {
+      "type": "image_url",
+      "image_url": {"url": "data:image/png;base64,<BASE64_PNG>", "detail": "auto"}
+    },
+    {
+      "type": "input_file",
+      "filename": "notes.md",
+      "file_data": "data:text/markdown;base64,<BASE64_MARKDOWN>"
+    }
+  ]
+}
+```
+
+Batas default adalah 10 attachment, 10 MiB hasil decode per attachment, dan 25
+MiB hasil decode total. PDF dan `file_id` belum didukung. Kontrak lengkap untuk
+implementasi VTI CLI atau extension tersedia di [Attachment contract](attachments.md).
