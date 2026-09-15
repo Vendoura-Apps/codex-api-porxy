@@ -13,6 +13,9 @@ test("validates bearer API keys", () => {
 test("advertises explicit Codex model choices", () => {
   assert.deepEqual(AVAILABLE_MODEL_IDS, [
     "codex",
+    "codex@ponytail-lite",
+    "codex@ponytail-full",
+    "codex@ponytail-ultra",
     "gpt-6-astra",
     "gpt-5.6-sol",
     "gpt-5.6",

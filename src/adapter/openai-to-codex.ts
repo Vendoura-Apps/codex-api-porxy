@@ -1,6 +1,12 @@
 /** Convert OpenAI chat requests into input for Codex CLI. */
 
 import { AttachmentError, AttachmentStore } from "../attachments/attachment-store.js";
+import {
+  applyPonytailToPrompt,
+  parsePonytailModel,
+  resolvePonytailMode,
+  type PonytailMode,
+} from "./ponytail.js";
 import type {
   OpenAIChatMessage,
   OpenAIChatRequest,
@@ -26,6 +32,7 @@ export interface PreparedCodexInput extends CodexInput {
   imagePaths: string[];
   appServerInput: CodexAppServerInput[];
   attachmentStore: AttachmentStore;
+  ponytailMode: PonytailMode;
 }
 
 export type CodexReasoningEffort =
@@ -57,11 +64,14 @@ export function normalizeReasoningEffort(value: unknown): CodexReasoningEffort |
 }
 
 export function extractModel(model?: string): { cliModel?: string; responseModel: string } {
-  const stripped = (model || "codex").replace(/^(?:codex-cli|codex)\//, "");
+  const requested = (model || "codex").replace(/^(?:codex-cli|codex)\//, "");
+  const parsed = parsePonytailModel(requested);
+  const stripped = parsed.model || "codex";
+  const responseModel = parsed.mode ? requested : stripped;
   if (stripped === "codex" || stripped === "default" || stripped === "") {
-    return { responseModel: "codex" };
+    return { responseModel };
   }
-  return { cliModel: stripped, responseModel: stripped };
+  return { cliModel: stripped, responseModel };
 }
 
 export function extractText(content: string | OpenAIContentBlock[] | null): string {
@@ -171,11 +181,13 @@ export async function prepareCodexInput(
       }
     }
     flushText();
+    const ponytailMode = resolvePonytailMode(request.ponytail, request.model);
     return {
-      prompt: prompt.trim(),
+      prompt: applyPonytailToPrompt(prompt.trim(), ponytailMode),
       appServerInput,
       imagePaths,
       attachmentStore: store,
+      ponytailMode,
       reasoningEffort: normalizeReasoningEffort(request.reasoning_effort),
       ...extractModel(request.model),
     };
@@ -186,8 +198,9 @@ export async function prepareCodexInput(
 }
 
 export function openaiToCodex(request: OpenAIChatRequest): CodexInput {
+  const ponytailMode = resolvePonytailMode(request.ponytail, request.model);
   return {
-    prompt: messagesToPrompt(request.messages),
+    prompt: applyPonytailToPrompt(messagesToPrompt(request.messages), ponytailMode),
     reasoningEffort: normalizeReasoningEffort(request.reasoning_effort),
     ...extractModel(request.model),
   };
@@ -195,8 +208,12 @@ export function openaiToCodex(request: OpenAIChatRequest): CodexInput {
 
 export function openaiToCodexDelta(request: OpenAIChatRequest, sinceIndex: number): CodexInput {
   const appended = request.messages.slice(sinceIndex).filter((message) => message.role !== "assistant");
+  const ponytailMode = resolvePonytailMode(request.ponytail, request.model);
   return {
-    prompt: messagesToPrompt(appended.length ? appended : request.messages),
+    prompt: applyPonytailToPrompt(
+      messagesToPrompt(appended.length ? appended : request.messages),
+      ponytailMode
+    ),
     reasoningEffort: normalizeReasoningEffort(request.reasoning_effort),
     ...extractModel(request.model),
   };

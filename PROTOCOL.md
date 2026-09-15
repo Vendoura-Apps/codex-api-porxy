@@ -18,6 +18,18 @@ Accepted canonical values are `none`, `minimal`, `low`, `medium`, `high`,
 `extra_high`, or `extra high` to `xhigh`. Unsupported values receive HTTP 400.
 The selected Codex model determines which canonical values it supports.
 
+## Optional Ponytail profile
+
+The request extension `ponytail` accepts `off`, `lite`, `full`, `ultra`, or a
+boolean (`true` maps to `full`). The per-request value takes precedence over a
+model suffix such as `codex@ponytail-full`, which takes precedence over
+`CODEX_PONYTAIL_DEFAULT`. The fallback is `off`.
+
+For `codex exec`, the proxy prepends a bounded developer-instruction section
+to the generated stdin prompt. For App Server agent-bridge turns, the same
+profile is added to `developerInstructions`; it is not duplicated in the user
+input. Model suffixes are removed before the model is passed to Codex.
+
 It sends the generated prompt through stdin. A continued turn uses:
 
 ```bash

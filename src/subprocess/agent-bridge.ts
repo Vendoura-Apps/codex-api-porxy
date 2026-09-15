@@ -6,10 +6,12 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import {
+  extractModel,
   extractText,
   prepareCodexInput,
   type PreparedCodexInput,
 } from "../adapter/openai-to-codex.js";
+import { ponytailInstructions } from "../adapter/ponytail.js";
 import type {
   OpenAIChatMessage,
   OpenAIChatRequest,
@@ -176,11 +178,10 @@ class CodexAgentTurn {
       });
       this.notify("initialized", {});
 
-      const model = request.model && !["codex", "default"].includes(request.model)
-        ? request.model.replace(/^(?:codex-cli|codex)\//, "")
-        : undefined;
+      const model = extractModel(request.model).cliModel;
       const dynamicTools = openaiToolsToDynamicTools(request.tools || []);
       const choiceInstruction = toolChoiceInstruction(request.tool_choice);
+      const ponytailInstruction = ponytailInstructions(this.preparedInput.ponytailMode);
       const threadResult = await this.rpc("thread/start", {
         model,
         cwd: safeBridgeCwd(),
@@ -208,6 +209,7 @@ class CodexAgentTurn {
           "When asked about the active workspace, call the client workspace-info tool before answering.",
           "Inspect the client workspace with tools before making claims about its code.",
           choiceInstruction,
+          ponytailInstruction,
         ].filter(Boolean).join(" "),
       }) as { thread?: { id?: string } };
 

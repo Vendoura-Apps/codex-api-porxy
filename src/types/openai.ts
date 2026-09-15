@@ -62,6 +62,8 @@ export interface OpenAIChatRequest {
   messages: OpenAIChatMessage[];
   stream?: boolean;
   reasoning_effort?: string;
+  /** Optional coding profile. true is equivalent to full; false is equivalent to off. */
+  ponytail?: "off" | "lite" | "full" | "ultra" | boolean;
   tools?: OpenAIFunctionTool[];
   tool_choice?: "none" | "auto" | "required" | Record<string, unknown>;
   temperature?: number;

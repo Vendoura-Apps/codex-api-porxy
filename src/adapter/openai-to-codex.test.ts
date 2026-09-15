@@ -17,6 +17,16 @@ describe("OpenAI to Codex adapter", () => {
     });
   });
 
+  it("strips a Ponytail suffix before selecting the CLI model", () => {
+    assert.deepEqual(extractModel("codex@ponytail-full"), {
+      responseModel: "codex@ponytail-full",
+    });
+    assert.deepEqual(extractModel("gpt-example@ponytail-ultra"), {
+      cliModel: "gpt-example",
+      responseModel: "gpt-example@ponytail-ultra",
+    });
+  });
+
   it("preserves system, user, assistant, and content-block text", () => {
     const prompt = messagesToPrompt([
       { role: "system", content: "Be concise." },
@@ -54,5 +64,15 @@ describe("OpenAI to Codex adapter", () => {
       messages: [{ role: "user", content: "hello" }],
     });
     assert.equal(input.reasoningEffort, "xhigh");
+  });
+
+  it("adds Ponytail instructions to CLI prompts", () => {
+    const input = openaiToCodex({
+      model: "codex",
+      ponytail: "lite",
+      messages: [{ role: "user", content: "hello" }],
+    });
+    assert.match(input.prompt, /mode="lite"/);
+    assert.match(input.prompt, /hello$/);
   });
 });

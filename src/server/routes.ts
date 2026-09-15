@@ -10,6 +10,10 @@ import {
   type PreparedCodexInput,
 } from "../adapter/openai-to-codex.js";
 import { AttachmentError } from "../attachments/attachment-store.js";
+import {
+  hasInvalidPonytailModelSuffix,
+  normalizePonytailMode,
+} from "../adapter/ponytail.js";
 import { createDoneChunk, createTextChunk, codexResultToOpenai } from "../adapter/codex-to-openai.js";
 import { clearSession, getSession, setSession } from "../subprocess/session-store.js";
 import {
@@ -31,6 +35,9 @@ interface SessionContext {
 /** Model IDs available through the authenticated Codex CLI on this server. */
 export const AVAILABLE_MODEL_IDS = [
   "codex",
+  "codex@ponytail-lite",
+  "codex@ponytail-full",
+  "codex@ponytail-ultra",
   "gpt-6-astra",
   "gpt-5.6-sol",
   "gpt-5.6",
@@ -82,6 +89,18 @@ export async function handleChatCompletions(req: Request, res: Response): Promis
         message: "reasoning_effort must be one of: none, minimal, light, low, medium, high, extra-high, xhigh, max",
         type: "invalid_request_error",
         code: "invalid_reasoning_effort",
+      },
+    });
+    return;
+  }
+
+  if ((body.ponytail !== undefined && !normalizePonytailMode(body.ponytail)) ||
+      hasInvalidPonytailModelSuffix(body.model)) {
+    res.status(400).json({
+      error: {
+        message: "ponytail must be one of: off, lite, full, ultra, true, false",
+        type: "invalid_request_error",
+        code: "invalid_ponytail_mode",
       },
     });
     return;

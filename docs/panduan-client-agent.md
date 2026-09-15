@@ -115,6 +115,7 @@ models:
     requestOptions:
       extraBodyProperties:
         reasoning_effort: medium
+        ponytail: full
 ```
 
 `capabilities: [tool_use]` harus aktif agar Continue mengirim daftar tool ke
@@ -130,6 +131,9 @@ dan jangan mengubah file apa pun.
 
 Continue seharusnya menampilkan aktivitas tool lokal. Hasil pembacaan file
 dikirim ke Codex melalui proxy, lalu jawaban kembali ke Continue.
+
+Hapus baris `ponytail: full` atau ubah menjadi `ponytail: off` untuk mematikan
+profil Ponytail. Pilihan lainnya adalah `lite` dan `ultra`.
 
 ## 5. Gunakan di Chat bawaan VS Code
 
@@ -157,6 +161,19 @@ Jalankan **Chat: Manage Language Models**, pilih **Add Models**, lalu pilih
         "reasoningEffortFormat": "chat-completions",
         "maxInputTokens": 128000,
         "maxOutputTokens": 16000
+      },
+      {
+        "id": "codex@ponytail-full",
+        "name": "Codex + Ponytail Full",
+        "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
+        "toolCalling": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true,
+        "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
+        "reasoningEffortFormat": "chat-completions",
+        "maxInputTokens": 128000,
+        "maxOutputTokens": 16000
       }
     ]
   }
@@ -168,6 +185,9 @@ pilih model **Codex Tailscale**, kemudian gunakan Agent mode. Dukungan tool dari
 Custom Endpoint dapat berbeda menurut versi VS Code. Jika Chat bekerja tetapi
 Agent mode tidak mengirim tool, gunakan Continue dengan konfigurasi pada bagian
 sebelumnya.
+
+Di pemilih model, **Codex Tailscale** menggunakan mode default server,
+sedangkan **Codex + Ponytail Full** selalu mengaktifkan Ponytail `full`.
 
 ## 6. Cara menggunakan Agent mode dengan aman
 
@@ -190,6 +210,9 @@ Model yang diiklankan endpoint:
 | Model | Penggunaan singkat |
 | --- | --- |
 | `codex` | Mengikuti model default akun Codex server; pilihan awal terbaik |
+| `codex@ponytail-lite` | Model default dengan profil Ponytail ringan |
+| `codex@ponytail-full` | Model default dengan profil Ponytail penuh |
+| `codex@ponytail-ultra` | Model default dengan pembatasan scope paling ketat |
 | `gpt-6-astra` | Tugas coding dan penalaran paling sulit |
 | `gpt-5.6-sol` | Pekerjaan kompleks berkualitas tinggi |
 | `gpt-5.6` | Alias keluarga GPT-5.6 |
@@ -205,6 +228,10 @@ Nilai reasoning effort yang umum adalah `low`, `medium`, `high`, `xhigh`, dan
 `max`. Alias `light` dipetakan ke `low`, sedangkan `extra-high` dipetakan ke
 `xhigh`. Tingkat yang lebih tinggi biasanya membutuhkan waktu dan kuota lebih
 banyak.
+
+Ponytail mengatur gaya kerja coding dan terpisah dari reasoning effort. Mode
+`off`, `lite`, `full`, atau `ultra` dapat dikirim melalui field `ponytail`.
+Panduan lengkap tersedia di [Mode Ponytail opsional](ponytail.md).
 
 ## 8. Pemecahan masalah
 

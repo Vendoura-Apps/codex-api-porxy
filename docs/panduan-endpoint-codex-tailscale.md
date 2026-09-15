@@ -186,6 +186,9 @@ dan tahap rollout akun yang digunakan komputer server.
 | Nilai `model` | Kegunaan | Catatan |
 | --- | --- | --- |
 | `codex` | Pilihan utama untuk penggunaan umum | Mengikuti model default pada konfigurasi Codex CLI server |
+| `codex@ponytail-lite` | Model default dengan profil Ponytail ringan | Memudahkan pemilihan mode dari UI klien |
+| `codex@ponytail-full` | Model default dengan profil Ponytail penuh | Mode Ponytail yang disarankan untuk coding |
+| `codex@ponytail-ultra` | Model default dengan pembatasan scope paling ketat | Cocok saat ingin menekan kompleksitas secara agresif |
 | `gpt-6-astra` | Pekerjaan end-to-end paling sulit, coding, riset, dan penalaran mendalam | Model paling mampu; akses dapat bergantung pada paket dan rollout |
 | `gpt-5.6-sol` | Coding kompleks, analisis, riset, dan pekerjaan yang memerlukan kualitas tinggi | Model GPT-5.6 paling mampu |
 | `gpt-5.6` | Alias praktis GPT-5.6 | Saat ini merupakan alias untuk `gpt-5.6-sol` |
@@ -252,8 +255,29 @@ Nilai yang diterima proxy:
 Jika field ini tidak dikirim, proxy mengikuti `model_reasoning_effort` pada
 konfigurasi Codex CLI server. Tidak semua model mendukung semua tingkat; bila
 kombinasinya tidak tersedia, Codex CLI akan mengembalikan error. `ultra` bukan
-nilai reasoning effort per request karena mode tersebut mengatur orkestrasi
-multi-agent Codex.
+nilai reasoning effort; pada proxy ini nama tersebut hanya dipakai sebagai
+mode Ponytail.
+
+## Mengaktifkan atau mematikan Ponytail
+
+Ponytail adalah profil instruksi coding yang terpisah dari model dan reasoning
+effort. Aktifkan per request dengan field berikut:
+
+```json
+{
+  "model": "codex",
+  "ponytail": "full",
+  "messages": [
+    {"role": "user", "content": "Perbaiki bug ini dengan perubahan minimal."}
+  ]
+}
+```
+
+Mode yang tersedia adalah `off`, `lite`, `full`, dan `ultra`. Klien yang tidak
+dapat mengirim field tambahan dapat memilih ID model
+`codex@ponytail-full`. Field request mempunyai prioritas bila keduanya dipakai.
+Lihat [Mode Ponytail opsional](ponytail.md) untuk contoh Continue, VS Code,
+`curl`, default server, dan aturan prioritas lengkap.
 
 ## Streaming SSE
 
@@ -325,6 +349,19 @@ Jika perlu mengedit `chatLanguageModels.json` secara manual, gunakan:
       {
         "id": "codex",
         "name": "Codex CLI Default",
+        "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
+        "toolCalling": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true,
+        "supportsReasoningEffort": ["low", "medium", "high", "xhigh", "max"],
+        "reasoningEffortFormat": "chat-completions",
+        "maxInputTokens": 128000,
+        "maxOutputTokens": 16000
+      },
+      {
+        "id": "codex@ponytail-full",
+        "name": "Codex + Ponytail Full",
         "url": "https://spark-2209.tail921925.ts.net:8443/v1/chat/completions",
         "toolCalling": true,
         "vision": true,
@@ -422,12 +459,14 @@ models:
     requestOptions:
       extraBodyProperties:
         reasoning_effort: medium
+        ponytail: full
 ```
 
 Ganti `YOUR_CODEX_PROXY_API_KEY` dengan key proxy asli. Untuk menambah model,
 salin blok kedua lalu ganti `name` dan `model` dengan ID dari tabel model.
 `requestOptions.extraBodyProperties.reasoning_effort` bersifat opsional dan
 dapat diisi `low`, `medium`, `high`, `xhigh`, atau `max` sesuai model.
+Field `ponytail` juga opsional; isi `off`, `lite`, `full`, atau `ultra`.
 
 Capability `tool_use` mengaktifkan Agent mode Continue. Buka repository rekan
 sebagai workspace, pilih model proxy, lalu gunakan Agent mode. Continue
@@ -494,6 +533,7 @@ Field permintaan yang digunakan:
 | `stream` | Opsional | Aktifkan SSE dengan nilai `true` |
 | `user` | Opsional | Kunci sesi untuk melanjutkan thread Codex |
 | `reasoning_effort` | Opsional | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, atau `max`; alias `light` dan `extra-high` juga diterima |
+| `ponytail` | Opsional | Profil coding `off`, `lite`, `full`, atau `ultra`; boolean `true` sama dengan `full` |
 | `tools` | Opsional | Daftar function tools OpenAI; mengaktifkan agent bridge |
 | `tool_choice` | Opsional | `auto`, `required`, atau `none`; `none` mematikan agent bridge untuk request awal |
 | `temperature` | Diabaikan | Tidak diteruskan ke Codex CLI |

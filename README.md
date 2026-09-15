@@ -78,6 +78,14 @@ Set `reasoning_effort` per request to `none`, `minimal`, `low`, `medium`,
 and `xhigh`. Availability depends on the selected model; omitting the field
 uses the Codex CLI configuration. `ultra` is not a reasoning-effort value.
 
+Enable the optional Ponytail-inspired coding profile per request with
+`"ponytail":"lite"`, `"full"`, or `"ultra"`; use `"off"` to disable it.
+Clients that cannot add custom body fields can select
+`codex@ponytail-lite`, `codex@ponytail-full`, or `codex@ponytail-ultra` as the
+model ID. The proxy strips the suffix before selecting the underlying Codex
+model. See [Optional Ponytail mode](docs/ponytail.md) for client examples and
+precedence rules.
+
 ## Conversation sessions
 
 Set a stable OpenAI `user` value to retain conversation context. The first
@@ -94,6 +102,7 @@ six hours and reset when the server restarts.
 | `CODEX_SANDBOX` | `read-only` | `read-only`, `workspace-write`, or `danger-full-access` |
 | `CODEX_AGENT_BRIDGE_CWD` | isolated directory under the OS temp folder | Safe server-side directory used by agent bridge sessions |
 | `CODEX_AGENT_BRIDGE_MAX_ACTIVE` | `16` | Maximum number of agent turns waiting for client tool results |
+| `CODEX_PONYTAIL_DEFAULT` | `off` | Default optional coding profile: `off`, `lite`, `full`, or `ultra` |
 | `CODEX_ATTACHMENT_MAX_COUNT` | `10` | Maximum attachments per request |
 | `CODEX_ATTACHMENT_MAX_BYTES` | `10485760` | Maximum decoded bytes per attachment |
 | `CODEX_ATTACHMENT_MAX_TOTAL_BYTES` | `26214400` | Maximum decoded attachment bytes per request |
@@ -162,7 +171,11 @@ npm run test:e2e
 - Codex App Server dynamic tools are currently an experimental Codex API.
 - Sampling fields such as `temperature` and `top_p` are not forwarded.
 - `reasoning_effort` is forwarded to Codex CLI as `model_reasoning_effort`.
+- `ponytail` is a proxy instruction profile and is independent from reasoning effort.
 
 ## License
 
 MIT
+
+The optional Ponytail-compatible profile is inspired by
+[Ponytail](https://github.com/dietrichgebert/ponytail), licensed under MIT.
