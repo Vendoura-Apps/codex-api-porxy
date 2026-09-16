@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { prepareCodexInput } from "../adapter/openai-to-codex.js";
-import { AttachmentError, requestBodyMaxBytes } from "./attachment-store.js";
+import { AttachmentError, attachmentLimits, requestBodyMaxBytes } from "./attachment-store.js";
 
 const PNG = Buffer.from([
   137, 80, 78, 71, 13, 10, 26, 10,
@@ -68,6 +68,10 @@ describe("attachment preparation", () => {
     assert.equal(requestBodyMaxBytes(), 40 * 1024 * 1024);
     process.env.CODEX_HTTP_BODY_MAX_BYTES = "12345";
     assert.equal(requestBodyMaxBytes(), 12345);
+    process.env.CODEX_ATTACHMENT_MAX_PDF_PAGES = "999999";
+    process.env.CODEX_ATTACHMENT_MAX_ARCHIVE_DEPTH = "-1";
+    assert.equal(attachmentLimits().maxPdfPages, 50);
+    assert.equal(attachmentLimits().maxArchiveDepth, 2);
   });
 
   it("stores a valid PNG with restrictive permissions", async () => {
@@ -145,28 +149,26 @@ describe("attachment preparation", () => {
     assert.doesNotMatch(error.message, /PRIVATE_BASE64_MARKER/);
   });
 
-  it("rejects unsupported MIME types and PDFs", async () => {
+  it("rejects unsupported native image MIME types", async () => {
     await expectAttachmentError(prepareCodexInput(requestWith([{
       type: "image_url",
       image_url: { url: dataUrl("image/gif", Buffer.from("GIF89a")) },
     }])), "unsupported_attachment_mime", 400);
-    await expectAttachmentError(prepareCodexInput(requestWith([{
-      type: "input_file",
-      filename: "document.pdf",
-      file_data: dataUrl("application/pdf", "%PDF-1.7"),
-    }])), "pdf_attachment_unsupported", 400);
   });
 
-  it("rejects mismatched image signatures and invalid UTF-8", async () => {
+  it("rejects mismatched image signatures and falls back safely for non-UTF-8 files", async () => {
     await expectAttachmentError(prepareCodexInput(requestWith([{
       type: "image_url",
       image_url: { url: dataUrl("image/png", Buffer.from("not-a-png")) },
     }])), "invalid_image_signature", 400);
-    await expectAttachmentError(prepareCodexInput(requestWith([{
+    const input = await prepareCodexInput(requestWith([{
       type: "input_file",
       filename: "broken.txt",
       file_data: dataUrl("text/plain", Buffer.from([0xc3, 0x28])),
-    }])), "invalid_attachment_utf8", 400);
+    }]));
+    assert.match(input.prompt, /Semantic content was not extracted/);
+    assert.match(input.prompt, /sha256/);
+    input.attachmentStore.cleanup();
   });
 
   it("enforces per-attachment, total-size, and count limits", async () => {

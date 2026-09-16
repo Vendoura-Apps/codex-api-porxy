@@ -51,7 +51,7 @@ curl http://127.0.0.1:3456/v1/chat/completions \
 
 For SSE, add `"stream":true` to the JSON body and use `curl -N`.
 
-Images and UTF-8 text files can be sent as base64 data URLs in content blocks:
+Images and universal files can be sent as base64 data URLs in content blocks:
 
 ```bash
 curl http://127.0.0.1:3456/v1/chat/completions \
@@ -60,7 +60,8 @@ curl http://127.0.0.1:3456/v1/chat/completions \
     "model":"codex",
     "messages":[{"role":"user","content":[
       {"type":"text","text":"Describe this image"},
-      {"type":"image_url","image_url":{"url":"data:image/png;base64,<BASE64_PNG>"}}
+      {"type":"image_url","image_url":{"url":"data:image/png;base64,<BASE64_PNG>"}},
+      {"type":"input_file","filename":"report.pdf","file_data":"data:application/pdf;base64,<BASE64_PDF>"}
     ]}]
   }'
 ```
@@ -111,6 +112,14 @@ six hours and reset when the server restarts.
 | `CODEX_ATTACHMENT_MAX_COUNT` | `10` | Maximum attachments per request |
 | `CODEX_ATTACHMENT_MAX_BYTES` | `10485760` | Maximum decoded bytes per attachment |
 | `CODEX_ATTACHMENT_MAX_TOTAL_BYTES` | `26214400` | Maximum decoded attachment bytes per request |
+| `CODEX_ATTACHMENT_MAX_EXTRACTED_BYTES` | `2097152` | Maximum extracted prompt text per file |
+| `CODEX_ATTACHMENT_EXTRACTION_TIMEOUT_MS` | `15000` | Timeout for each optional external extractor |
+| `CODEX_ATTACHMENT_MAX_PDF_PAGES` | `50` | Maximum extracted/rendered PDF pages |
+| `CODEX_ATTACHMENT_MAX_ARCHIVE_ENTRIES` | `100` | Maximum entries per archive |
+| `CODEX_ATTACHMENT_MAX_ARCHIVE_DEPTH` | `2` | Maximum nested archive depth |
+| `CODEX_ATTACHMENT_MAX_SPREADSHEET_ROWS` | `200` | Maximum rows extracted per sheet |
+| `CODEX_ATTACHMENT_MAX_VIDEO_FRAMES` | `4` | Maximum locally extracted video frames |
+| `CODEX_ATTACHMENT_ENABLE_MEDIA_EXTRACTION` | `false` | Enable local transcript/frame processing |
 | `CODEX_HTTP_BODY_MAX_BYTES` | `41943040` | Maximum encoded JSON request body |
 | `CODEX_PROXY_API_KEY` | unset | Require this value as a Bearer token on all `/v1` routes |
 | `DEBUG` | unset | Log HTTP request metadata |
@@ -162,10 +171,13 @@ npm run test:e2e
 
 ## Compatibility notes
 
-- Text messages, base64 PNG/JPEG/WebP images, and allowlisted UTF-8 text files
-  are supported. Remote attachment URLs and `file_id` are rejected.
-- Images use native Codex image input. Text files are decoded into bounded,
-  clearly labeled prompt sections. PDF is not currently supported.
+- PNG/JPEG/WebP use native Codex image input. UTF-8 text, Office/OpenDocument,
+  RTF, and bounded ZIP/TAR/GZ extraction are built in. PDF and media use
+  feature-detected local programs; unknown binaries produce metadata-only
+  fallback. Remote attachment URLs and `file_id` are rejected.
+- PDF text needs `pdftotext`; optional page rendering needs `pdftoppm`.
+  Audio/video metadata needs `ffprobe`, and optional video frames need
+  `ffmpeg`. No attachment is uploaded to a third-party transcription service.
 - SSE text is delivered when a Codex agent-message item completes, rather than
   token by token.
 - OpenAI function `tools`, assistant `tool_calls`, and `tool` result messages are

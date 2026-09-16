@@ -49,13 +49,16 @@ export const AVAILABLE_MODEL_IDS = [
   "gpt-5.3-codex-spark",
 ] as const;
 
-async function resolveCliInput(body: OpenAIChatRequest): Promise<{ input: PreparedCodexInput; session: SessionContext }> {
+async function resolveCliInput(
+  body: OpenAIChatRequest,
+  signal?: AbortSignal
+): Promise<{ input: PreparedCodexInput; session: SessionContext }> {
   const sessionKey = body.user;
   const existing = sessionKey ? getSession(sessionKey) : undefined;
   if (existing) {
     const appended = body.messages.slice(existing.messageCount).filter((message) => message.role !== "assistant");
     return {
-      input: await prepareCodexInput(body, appended.length ? appended : body.messages),
+      input: await prepareCodexInput(body, appended.length ? appended : body.messages, signal),
       session: {
         sessionKey,
         threadId: existing.threadId,
@@ -65,7 +68,7 @@ async function resolveCliInput(body: OpenAIChatRequest): Promise<{ input: Prepar
     };
   }
   return {
-    input: await prepareCodexInput(body),
+    input: await prepareCodexInput(body, body.messages, signal),
     session: { sessionKey, resume: false, messageCount: body.messages.length },
   };
 }
@@ -108,15 +111,22 @@ export async function handleChatCompletions(req: Request, res: Response): Promis
     return;
   }
 
+  const preparationController = new AbortController();
+  const abortPreparation = () => preparationController.abort();
+  req.once("aborted", abortPreparation);
+  res.once("close", abortPreparation);
+
   try {
     if (isAgentBridgeRequest(body)) {
       const isContinuation = body.messages.some((message) => message.role === "tool");
-      const preparedInput = isContinuation ? undefined : await prepareCodexInput(body);
+      const preparedInput = isContinuation
+        ? undefined
+        : await prepareCodexInput(body, body.messages, preparationController.signal);
       await handleAgentBridgeResponse(res, body, requestId, preparedInput);
       return;
     }
 
-    const { input, session } = await resolveCliInput(body);
+    const { input, session } = await resolveCliInput(body, preparationController.signal);
     const subprocess = new CodexSubprocess();
     if (body.stream === true) {
       await handleStreamingResponse(res, subprocess, input, requestId, session);
@@ -133,6 +143,9 @@ export async function handleChatCompletions(req: Request, res: Response): Promis
     } else if (!res.writableEnded) {
       res.end();
     }
+  } finally {
+    req.removeListener("aborted", abortPreparation);
+    res.removeListener("close", abortPreparation);
   }
 }
 

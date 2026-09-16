@@ -70,16 +70,23 @@ return all of those tool outputs in the same follow-up HTTP request.
 
 ## Attachments
 
-The proxy decodes validated base64 data URLs into a unique temporary directory.
-For `codex exec`, image paths are passed as repeated `--image` arguments. For
-App Server, the generated protocol's native `localImage` input is used:
+The proxy decodes validated base64 data URLs into request-scoped storage,
+detects content independently from the declared MIME, and dispatches to a
+bounded extractor registry. Native images and generated PDF/video images are
+passed to `codex exec` as repeated `--image` arguments. App Server uses the
+generated protocol's native `localImage` input:
 
 ```json
 { "type": "localImage", "path": "/tmp/.../image-1.png", "detail": "auto" }
 ```
 
-Allowlisted UTF-8 files have no native App Server general-file input, so their
-decoded text is inserted at the corresponding content-block position in the
-prompt. PDF is rejected. The attachment store belongs to the request or active
-agent turn and is cleaned on every terminal lifecycle path. See
-[`docs/attachments.md`](docs/attachments.md) for the client contract.
+Extracted text and safe metadata are inserted at the corresponding content
+block position inside an explicit `trust="untrusted-data"` attachment boundary.
+Built-in extractors cover UTF-8 text, OOXML/OpenDocument, RTF, ZIP, TAR, and
+Gzip. PDF and media invoke feature-detected local binaries without a shell.
+Unknown binary files produce SHA-256 metadata and a bounded printable preview.
+
+The attachment store belongs to the request or active agent turn and is cleaned
+on success, error, abort, timeout, disconnect, expired tool call, and shutdown.
+See [`docs/attachments.md`](docs/attachments.md) for exact limits, error codes,
+dependency requirements, and format classifications.

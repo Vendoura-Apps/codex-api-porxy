@@ -547,10 +547,13 @@ Field permintaan yang digunakan:
 | `presence_penalty` | Diabaikan | Tidak diteruskan ke Codex CLI |
 
 Content yang didukung adalah teks biasa, `text`, `input_text`, gambar base64
-PNG/JPEG/WebP melalui `image_url` atau `input_image`, serta file teks UTF-8
-melalui `input_file`. Function tool calls dan pesan hasil tool juga didukung.
-PDF, audio, embeddings, Responses API, structured outputs, URL attachment
-remote, dan `file_id` belum didukung. Lihat [kontrak attachment](attachments.md).
+PNG/JPEG/WebP melalui `image_url` atau `input_image`, serta attachment universal
+melalui `input_file`: teks/source, PDF, DOCX/XLSX/PPTX, ODT/ODS/ODP, RTF,
+ZIP/TAR/GZ, audio/video, dan metadata fallback untuk binary lain. PDF dan media
+memerlukan dependency lokal yang dijelaskan pada
+[kontrak attachment](attachments.md). Function tool calls dan pesan hasil tool
+juga didukung. Embeddings, Responses API, structured outputs, URL attachment
+remote, dan `file_id` belum didukung.
 
 ## Ruang kerja dan izin
 
@@ -698,6 +701,11 @@ Proxy tidak memasang tool langsung pada perangkat klien. Pengalaman agent
 bergantung pada Continue, VS Code, atau klien lain yang benar-benar menyediakan
 function tools dan alur persetujuan. Dukungan UI untuk memilih serta mengirim
 attachment tetap bergantung pada versi klien yang digunakan.
+
+Attachment Office/OpenDocument dan arsip diproses oleh proxy dengan limit
+ketat. PDF memerlukan Poppler. Audio/video hanya menghasilkan metadata kecuali
+pengelola secara eksplisit mengaktifkan ekstraksi media lokal; proxy tidak
+mengunggah media ke layanan transkripsi pihak ketiga.
 
 ## Referensi
 

@@ -309,10 +309,11 @@ Codex pada server.
 
 ## Mengirim gambar dan file
 
-Klien dapat mengirim PNG, JPEG, WebP, serta file teks UTF-8 melalui content
-blocks. Aktifkan dukungan vision pada konfigurasi model dengan
-`"vision": true`. URL gambar dari internet tidak diterima; klien harus membaca
-file lokal dan mengirimkannya sebagai base64 data URL.
+Klien dapat mengirim PNG, JPEG, WebP, file teks/source, PDF, DOCX, XLSX, PPTX,
+ODT/ODS/ODP, RTF, ZIP/TAR/GZ, audio/video, dan binary lain melalui content
+blocks. Aktifkan dukungan vision dengan `"vision": true`. URL dari internet
+tidak diterima; klien harus membaca file lokal dan mengirimkannya sebagai
+base64 data URL.
 
 Contoh bentuk pesannya:
 
@@ -327,13 +328,16 @@ Contoh bentuk pesannya:
     },
     {
       "type": "input_file",
-      "filename": "notes.md",
-      "file_data": "data:text/markdown;base64,<BASE64_MARKDOWN>"
+      "filename": "report.pdf",
+      "file_data": "data:application/pdf;base64,<BASE64_PDF>"
     }
   ]
 }
 ```
 
-Batas default adalah 10 attachment, 10 MiB hasil decode per attachment, dan 25
-MiB hasil decode total. PDF dan `file_id` belum didukung. Kontrak lengkap untuk
-implementasi VTI CLI atau extension tersedia di [Attachment contract](attachments.md).
+Batas default adalah 10 attachment, 10 MiB hasil decode per attachment, 25 MiB
+hasil decode total, dan 2 MiB teks hasil ekstraksi per file. PDF memerlukan
+`pdftotext`; metadata audio/video memerlukan `ffprobe`. Binary yang belum
+memiliki extractor menghasilkan metadata, hash SHA-256, dan preview printable
+yang kecil. `file_id` tetap tidak didukung. Kontrak lengkap, dependency,
+limit arsip, dan error code tersedia di [Attachment contract](attachments.md).

@@ -28,6 +28,12 @@ Create `~/Library/LaunchAgents/com.codex-cli-api-proxy.plist`, replacing
     <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
     <key>CODEX_SANDBOX</key>
     <string>read-only</string>
+    <key>CODEX_ATTACHMENT_MAX_EXTRACTED_BYTES</key>
+    <string>2097152</string>
+    <key>CODEX_ATTACHMENT_ENABLE_MEDIA_EXTRACTION</key>
+    <string>false</string>
+    <key>CODEX_ATTACHMENT_RENDER_PDF_IMAGES</key>
+    <string>false</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>
