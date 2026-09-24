@@ -74,6 +74,7 @@ interface DynamicToolSpec {
 }
 
 const TURN_TIMEOUT = 15 * 60 * 1000;
+const DEFAULT_TOOL_OUTPUT_TIMEOUT = 15 * 60 * 1000;
 const RPC_TIMEOUT = 30 * 1000;
 const TOOL_BATCH_DELAY = 20;
 const BRIDGE_CWD = path.join(os.tmpdir(), "codex-api-proxy-agent-bridge");
@@ -124,6 +125,11 @@ function maxActiveTurns(): number {
   return Number.isInteger(configured) && configured > 0 ? configured : 16;
 }
 
+function toolOutputTimeout(): number {
+  const configured = Number(process.env.CODEX_AGENT_BRIDGE_TOOL_OUTPUT_TIMEOUT_MS || DEFAULT_TOOL_OUTPUT_TIMEOUT);
+  return Number.isInteger(configured) && configured > 0 ? configured : DEFAULT_TOOL_OUTPUT_TIMEOUT;
+}
+
 function toolChoiceInstruction(choice: OpenAIChatRequest["tool_choice"]): string | undefined {
   if (choice === "required") return "You must call at least one client-provided tool before answering.";
   if (choice && typeof choice === "object") {
@@ -152,6 +158,7 @@ class CodexAgentTurn {
   private toolCalls: OpenAIToolCall[] = [];
   private serverRequestIds = new Map<string, RpcId>();
   private toolBatchTimer: NodeJS.Timeout | null = null;
+  private toolOutputTimer: NodeJS.Timeout | null = null;
   private stderr = "";
   private disposed = false;
   private abortHandler: (() => void) | undefined;
@@ -244,6 +251,7 @@ class CodexAgentTurn {
         "incomplete_tool_outputs"
       );
     }
+    this.clearToolOutputTimer();
     this.streamEvents = streamEvents;
     const output = this.waitForOutput();
     try {
@@ -440,6 +448,17 @@ class CodexAgentTurn {
     this.abortHandler = undefined;
   }
 
+  private clearToolOutputTimer(): void {
+    if (this.toolOutputTimer) clearTimeout(this.toolOutputTimer);
+    this.toolOutputTimer = null;
+  }
+
+  private waitForToolOutputs(): void {
+    this.clearToolOutputTimer();
+    this.toolOutputTimer = setTimeout(() => this.dispose(), toolOutputTimeout());
+    this.toolOutputTimer.unref();
+  }
+
   private hasAttachments(): boolean {
     return this.preparedInput?.attachmentStore.directory !== undefined;
   }
@@ -459,6 +478,7 @@ class CodexAgentTurn {
     this.streamEvents = undefined;
     waiter.resolve({ text: this.text, toolCalls: [...this.toolCalls], finishReason: reason });
     if (reason === "stop") this.dispose();
+    else this.waitForToolOutputs();
   }
 
   private rejectOutput(error: Error): void {
@@ -485,6 +505,7 @@ class CodexAgentTurn {
     if (this.disposed) return;
     this.disposed = true;
     if (this.toolBatchTimer) clearTimeout(this.toolBatchTimer);
+    this.clearToolOutputTimer();
     for (const callId of this.serverRequestIds.keys()) pendingToolCalls.delete(callId);
     this.serverRequestIds.clear();
     activeTurns.delete(this);
