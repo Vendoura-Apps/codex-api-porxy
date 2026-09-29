@@ -693,7 +693,7 @@ rahasia. Semua konfigurasi klien dengan key lama akan menerima HTTP `401`.
 ## Batasan penting
 
 Agent bridge memakai fitur dynamic tools Codex App Server yang masih
-eksperimental. Pending tool call disimpan di memori selama maksimal 15 menit;
+eksperimental. Pending tool call disimpan di memori selama maksimal 60 menit;
 restart service membuat `tool_call_id` lama kedaluwarsa. Jika model meminta
 beberapa tool sekaligus, klien harus mengirim semua hasilnya dalam satu request.
 

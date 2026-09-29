@@ -74,7 +74,10 @@ interface DynamicToolSpec {
 }
 
 const TURN_TIMEOUT = 15 * 60 * 1000;
-const DEFAULT_TOOL_OUTPUT_TIMEOUT = 15 * 60 * 1000;
+// Local approvals, browser interaction, and client_ask_user may legitimately
+// keep a tool call open while the user is away from the editor. Keep model
+// execution at 15 minutes, but give pending client tool results a full hour.
+const DEFAULT_TOOL_OUTPUT_TIMEOUT = 60 * 60 * 1000;
 const RPC_TIMEOUT = 30 * 1000;
 const TOOL_BATCH_DELAY = 20;
 const BRIDGE_CWD = path.join(os.tmpdir(), "codex-api-proxy-agent-bridge");

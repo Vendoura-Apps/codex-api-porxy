@@ -276,7 +276,7 @@ klien.
 
 ### `invalid_tool_call_id` atau tool call kedaluwarsa
 
-Pending agent turn disimpan maksimal 15 menit dan hilang saat service restart.
+Pending agent turn disimpan maksimal 60 menit dan hilang saat service restart.
 Mulai percakapan atau task baru agar klien memperoleh `tool_call_id` baru.
 
 ### Model eksplisit gagal

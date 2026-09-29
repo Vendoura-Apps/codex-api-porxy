@@ -64,7 +64,7 @@ the final agent message.
 
 Built-in App Server command and file-change approval requests are declined.
 This prevents agent bridge turns from operating on the proxy repository. A
-pending bridge turn expires after 15 minutes and is also discarded when the
+pending bridge turn expires after 60 minutes and is also discarded when the
 service restarts. If Codex requests several tools together, the client must
 return all of those tool outputs in the same follow-up HTTP request.
 

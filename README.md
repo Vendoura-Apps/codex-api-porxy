@@ -108,7 +108,7 @@ six hours and reset when the server restarts.
 | `CODEX_SANDBOX` | `read-only` | `read-only`, `workspace-write`, or `danger-full-access` |
 | `CODEX_AGENT_BRIDGE_CWD` | isolated directory under the OS temp folder | Safe server-side directory used by agent bridge sessions |
 | `CODEX_AGENT_BRIDGE_MAX_ACTIVE` | `16` | Maximum number of agent turns waiting for client tool results |
-| `CODEX_AGENT_BRIDGE_TOOL_OUTPUT_TIMEOUT_MS` | `900000` | Release an abandoned agent turn after waiting this long for client tool results |
+| `CODEX_AGENT_BRIDGE_TOOL_OUTPUT_TIMEOUT_MS` | `3600000` | Release an abandoned agent turn after waiting this long for client tool results |
 | `CODEX_PONYTAIL_DEFAULT` | `off` | Default optional coding profile: `off`, `lite`, `full`, or `ultra` |
 | `CODEX_ATTACHMENT_MAX_COUNT` | `10` | Maximum attachments per request |
 | `CODEX_ATTACHMENT_MAX_BYTES` | `10485760` | Maximum decoded bytes per attachment |
@@ -184,7 +184,7 @@ npm run test:e2e
 - OpenAI function `tools`, assistant `tool_calls`, and `tool` result messages are
   supported through the agent bridge. Tool execution and user approval belong
   to the client device.
-- The agent bridge keeps pending calls in memory for up to 15 minutes. A proxy
+- The agent bridge keeps pending calls in memory for up to 60 minutes. A proxy
   restart invalidates pending `tool_call_id` values.
 - Codex App Server dynamic tools are currently an experimental Codex API.
 - Sampling fields such as `temperature` and `top_p` are not forwarded.
