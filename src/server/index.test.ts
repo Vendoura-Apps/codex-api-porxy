@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isValidBearerToken } from "./index.js";
-import { AVAILABLE_MODEL_IDS } from "./routes.js";
+import { AVAILABLE_MODEL_IDS, startSseHeartbeat } from "./routes.js";
 import { configuredCodexModel, modelMetadata } from "./model-catalog.js";
 
 test("validates bearer API keys", () => {
@@ -42,4 +42,18 @@ test("publishes model-aware context and compaction metadata", () => {
     auto_compact_threshold: 90_000,
   });
   assert.equal(configuredCodexModel({ CODEX_DEFAULT_MODEL: "gpt-test" }), "gpt-test");
+});
+
+test("emits SSE heartbeats while a long response is idle", async () => {
+  const chunks: string[] = [];
+  const response = {
+    writableEnded: false,
+    destroyed: false,
+    write(chunk: unknown) { chunks.push(String(chunk)); return true; },
+  };
+  const timer = startSseHeartbeat(response, 10);
+  try { await new Promise((resolve) => setTimeout(resolve, 35)); }
+  finally { clearInterval(timer); }
+  assert.ok(chunks.length >= 2);
+  assert.ok(chunks.every((chunk) => chunk.startsWith(":heartbeat ") && chunk.endsWith("\n\n")));
 });

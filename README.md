@@ -180,7 +180,9 @@ npm run test:e2e
   Audio/video metadata needs `ffprobe`, and optional video frames need
   `ffmpeg`. No attachment is uploaded to a third-party transcription service.
 - SSE text is delivered when a Codex agent-message item completes, rather than
-  token by token.
+  token by token. An SSE comment heartbeat is emitted every 15 seconds while
+  output is idle so Tailscale Serve and other reverse proxies keep long turns
+  connected.
 - OpenAI function `tools`, assistant `tool_calls`, and `tool` result messages are
   supported through the agent bridge. Tool execution and user approval belong
   to the client device.

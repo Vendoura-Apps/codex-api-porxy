@@ -33,6 +33,8 @@ interface SessionContext {
   messageCount: number;
 }
 
+const SSE_HEARTBEAT_MS = 15_000;
+
 /** Model IDs available through the authenticated Codex CLI on this server. */
 export const AVAILABLE_MODEL_IDS = [
   "codex",
@@ -211,6 +213,7 @@ async function writeAgentBridgeStream(
   res.setHeader("X-Request-Id", requestId);
   res.flushHeaders();
   res.write(":ok\n\n");
+  const heartbeat = startSseHeartbeat(res);
 
   const created = Math.floor(Date.now() / 1000);
   let first = true;
@@ -270,7 +273,22 @@ async function writeAgentBridgeStream(
       res.write("data: [DONE]\n\n");
       res.end();
     }
+  } finally {
+    clearInterval(heartbeat);
   }
+}
+
+export function startSseHeartbeat(
+  res: Pick<Response, "writableEnded" | "destroyed" | "write">,
+  intervalMs = SSE_HEARTBEAT_MS
+): NodeJS.Timeout {
+  const timer = setInterval(() => {
+    if (res.writableEnded || res.destroyed) return;
+    try { res.write(`:heartbeat ${Date.now()}\n\n`); }
+    catch { /* The response close handler owns connection cleanup. */ }
+  }, intervalMs);
+  timer.unref();
+  return timer;
 }
 
 function rememberSession(session: SessionContext, result: CodexResult): void {
@@ -296,6 +314,7 @@ async function handleStreamingResponse(
   res.setHeader("X-Request-Id", requestId);
   res.flushHeaders();
   res.write(":ok\n\n");
+  const heartbeat = startSseHeartbeat(res);
 
   return new Promise<void>((resolve) => {
     let finished = false;
@@ -304,12 +323,14 @@ async function handleStreamingResponse(
     const finish = () => {
       if (finished) return;
       finished = true;
+      clearInterval(heartbeat);
       input.attachmentStore.cleanup();
       if (!res.writableEnded) res.end();
       resolve();
     };
 
     res.on("close", () => {
+      clearInterval(heartbeat);
       if (!finished) subprocess.kill();
       input.attachmentStore.cleanup();
       finished = true;
